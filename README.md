@@ -62,7 +62,7 @@ Support for skipping destroy operations when needed for debugging.
 
 ## Options
 
-Diffy supports a functional options pattern for configuration:
+The below options are supported:
 
 `-skip-destroy`: Skip running terraform destroy after apply. Default is false.
 
