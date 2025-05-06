@@ -1,4 +1,3 @@
-// Package validor provides tools for testing Terraform modules
 package validor
 
 import (
