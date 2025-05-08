@@ -11,11 +11,13 @@ var redError = color.New(color.FgHiRed, color.Bold).SprintFunc()
 // parseExceptionList converts a comma-separated list to a map
 func parseExceptionList() {
 	exceptionList = make(map[string]bool)
-	if exception != "" {
-		examples := strings.Split(exception, ",")
-		for _, ex := range examples {
-			exceptionList[strings.TrimSpace(ex)] = true
-		}
+	if exception == "" {
+		return
+	}
+
+	// Using FieldsFunc for potential better performance
+	for _, ex := range strings.FieldsFunc(exception, func(r rune) bool { return r == ',' }) {
+		exceptionList[strings.TrimSpace(ex)] = true
 	}
 }
 
