@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.0.0...v1.0.1) (2025-05-08)
+
+
+### Bug Fixes
+
+* use fieldfunc for better performance and fix linting issues ([#5](https://github.com/CloudNationHQ/az-cn-go-validor/issues/5)) ([2e60275](https://github.com/CloudNationHQ/az-cn-go-validor/commit/2e60275b89a2b386865e0641a0a48f5cf5eb26ab))
+
 ## 1.0.0 (2025-05-06)
 
 
