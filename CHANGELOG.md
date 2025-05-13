@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.0.1...v1.1.0) (2025-05-13)
+
+
+### Features
+
+* **deps:** bump github.com/gruntwork-io/terratest from 0.48.2 to 0.49.0 ([#7](https://github.com/CloudNationHQ/az-cn-go-validor/issues/7)) ([548dbe7](https://github.com/CloudNationHQ/az-cn-go-validor/commit/548dbe70ebf40bcf0b443c0004863dba56188754))
+
 ## [1.0.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.0.0...v1.0.1) (2025-05-08)
 
 
