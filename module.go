@@ -1,7 +1,6 @@
 package validor
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -75,71 +74,31 @@ func (mm *ModuleManager) DiscoverModules() ([]*Module, error) {
 	return modules, nil
 }
 
-// Apply deploys a Terraform module with context support
-func (m *Module) Apply(ctx context.Context, t *testing.T) error {
+// Apply deploys a Terraform module
+func (m *Module) Apply(t *testing.T) error {
 	t.Helper()
-
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("context cancelled before applying module %s: %w", m.Name, err)
-	}
 
 	t.Logf("Applying Terraform module: %s", m.Name)
 	terraform.WithDefaultRetryableErrors(t, m.Options)
 
-	type result struct {
-		err error
+	_, err := terraform.InitAndApplyE(t, m.Options)
+	if err != nil {
+		m.ApplyFailed = true
+		wrappedErr := fmt.Errorf("terraform apply failed for module %s: %w", m.Name, err)
+		m.Errors = append(m.Errors, wrappedErr.Error())
+		t.Log(redError(wrappedErr.Error()))
+		return wrappedErr
 	}
-
-	resultCh := make(chan result, 1)
-
-	go func() {
-		_, err := terraform.InitAndApplyE(t, m.Options)
-		resultCh <- result{err: err}
-	}()
-
-	select {
-	case res := <-resultCh:
-		if res.err != nil {
-			m.ApplyFailed = true
-			wrappedErr := fmt.Errorf("terraform apply failed for module %s: %w", m.Name, res.err)
-			m.Errors = append(m.Errors, wrappedErr.Error())
-			t.Log(redError(wrappedErr.Error()))
-			return wrappedErr
-		}
-		return nil
-	case <-ctx.Done():
-		return fmt.Errorf("context cancelled while applying module %s: %w", m.Name, ctx.Err())
-	}
+	return nil
 }
 
-// Destroy tears down a deployed Terraform module with context support
-func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
+// Destroy tears down a deployed Terraform module
+func (m *Module) Destroy(t *testing.T) error {
 	t.Helper()
-
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("context cancelled before destroying module %s: %w", m.Name, err)
-	}
 
 	t.Logf("Destroying Terraform module: %s", m.Name)
 
-	type result struct {
-		err error
-	}
-
-	resultCh := make(chan result, 1)
-
-	go func() {
-		_, err := terraform.DestroyE(t, m.Options)
-		resultCh <- result{err: err}
-	}()
-
-	var destroyErr error
-	select {
-	case res := <-resultCh:
-		destroyErr = res.err
-	case <-ctx.Done():
-		return fmt.Errorf("context cancelled while destroying module %s: %w", m.Name, ctx.Err())
-	}
+	_, destroyErr := terraform.DestroyE(t, m.Options)
 
 	if destroyErr != nil && !m.ApplyFailed {
 		wrappedErr := fmt.Errorf("terraform destroy failed for module %s: %w", m.Name, destroyErr)

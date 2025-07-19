@@ -4,14 +4,12 @@
 package validor
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
 var (
@@ -61,9 +59,6 @@ func TestApplyNoError(t *testing.T) {
 
 	exampleList := parseExampleList(config.Example)
 	results := NewTestResults()
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
-	defer cancel()
 
 	for _, ex := range exampleList {
 		if config.ExceptionList[ex] {
@@ -76,14 +71,14 @@ func TestApplyNoError(t *testing.T) {
 			modulePath := filepath.Join("..", "examples", ex)
 			module := NewModule(ex, modulePath)
 
-			if err := module.Apply(ctx, t); err != nil {
+			if err := module.Apply(t); err != nil {
 				t.Fail()
 			} else {
 				t.Logf("✓ Module %s applied successfully", module.Name)
 			}
 
 			if !config.SkipDestroy {
-				if err := module.Destroy(ctx, t); err != nil && !module.ApplyFailed {
+				if err := module.Destroy(t); err != nil && !module.ApplyFailed {
 					t.Logf("Cleanup failed for module %s: %v", module.Name, err)
 				}
 			}
