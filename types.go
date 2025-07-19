@@ -1,35 +1,46 @@
 package validor
 
 import (
+	"context"
+	"sync"
 	"testing"
 )
 
 // ModuleProcessor defines methods for processing Terraform modules
 type ModuleProcessor interface {
-	Apply(t *testing.T) error
-	Destroy(t *testing.T) error
+	Apply(ctx context.Context, t *testing.T) error
+	Destroy(ctx context.Context, t *testing.T) error
 	CleanupFiles(t *testing.T) error
 }
 
-// ModuleDiscoverer discovers modules within a directory structure
-type ModuleDiscoverer interface {
-	DiscoverModules() ([]*Module, error)
+// TestResults holds the results of module tests in a thread-safe manner
+type TestResults struct {
+	mu            sync.RWMutex
+	modules       []*Module
+	failedModules []*Module
 }
 
-// TestRunner runs tests for Terraform modules
-type TestRunner interface {
-	RunTests(t *testing.T, modules []*Module, parallel bool)
+// NewTestResults creates a new TestResults instance
+func NewTestResults() *TestResults {
+	return &TestResults{
+		modules:       make([]*Module, 0),
+		failedModules: make([]*Module, 0),
+	}
 }
 
-// Logger provides logging capabilities
-type Logger interface {
-	Logf(format string, args ...any)
+// AddModule adds a module to the results in a thread-safe way
+func (tr *TestResults) AddModule(module *Module) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	tr.modules = append(tr.modules, module)
+	if len(module.Errors) > 0 {
+		tr.failedModules = append(tr.failedModules, module)
+	}
 }
 
-// SimpleLogger is a basic implementation of the Logger interface
-type SimpleLogger struct{}
-
-// Logf implements the Logger interface
-func (l *SimpleLogger) Logf(format string, args ...any) {
-	// Use t.Logf directly in testing context
+// GetResults returns the modules and failed modules in a thread-safe way
+func (tr *TestResults) GetResults() ([]*Module, []*Module) {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
+	return tr.modules, tr.failedModules
 }
