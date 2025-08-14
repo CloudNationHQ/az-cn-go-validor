@@ -8,12 +8,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 )
 
 var (
-	configOnce   sync.Once
 	globalConfig *Config
 )
 
@@ -25,14 +23,16 @@ type Config struct {
 	ExceptionList map[string]bool
 }
 
-// GetConfig returns a singleton configuration instance
+// init registers flags before the test framework parses command line arguments
+func init() {
+	globalConfig = &Config{}
+	flag.BoolVar(&globalConfig.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
+	flag.StringVar(&globalConfig.Exception, "exception", "", "Comma-separated list of examples to exclude")
+	flag.StringVar(&globalConfig.Example, "example", "", "Specific example(s) to test (comma-separated)")
+}
+
+// GetConfig returns the global configuration instance
 func GetConfig() *Config {
-	configOnce.Do(func() {
-		globalConfig = &Config{}
-		flag.BoolVar(&globalConfig.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
-		flag.StringVar(&globalConfig.Exception, "exception", "", "Comma-separated list of examples to exclude")
-		flag.StringVar(&globalConfig.Example, "example", "", "Specific example(s) to test (comma-separated)")
-	})
 	return globalConfig
 }
 
@@ -50,7 +50,6 @@ func (c *Config) ParseExceptionList() {
 // TestApplyNoError tests one or more specific Terraform modules
 func TestApplyNoError(t *testing.T) {
 	config := GetConfig()
-	flag.Parse()
 	config.ParseExceptionList()
 
 	if config.Example == "" {
@@ -96,7 +95,6 @@ func TestApplyNoError(t *testing.T) {
 // TestApplyAllParallel tests all Terraform modules in parallel
 func TestApplyAllParallel(t *testing.T) {
 	config := GetConfig()
-	flag.Parse()
 	config.ParseExceptionList()
 
 	manager := NewModuleManager(filepath.Join("..", "examples"))
