@@ -185,6 +185,49 @@ func TestApplyAllLocal(t *testing.T) {
 	RunTests(t, modules, true, config)
 }
 
+// ValidateLocalChanges validates all examples against local source with terraform plan
+func ValidateLocalChanges(examplesPath string) error {
+	moduleInfo := extractModuleInfoFromRepo()
+	if moduleInfo.Name == "" || moduleInfo.Provider == "" {
+		return fmt.Errorf("could not determine module name and provider from repository")
+	}
+
+	// Discover all example modules
+	manager := NewModuleManager(examplesPath)
+	modules, err := manager.DiscoverModules()
+	if err != nil {
+		return fmt.Errorf("failed to discover modules: %v", err)
+	}
+
+	// Convert all modules to use local source
+	var allFilesToRestore []FileRestore
+	for _, module := range modules {
+		filesToRestore, err := convertToLocalSource(module.Path, moduleInfo)
+		if err != nil {
+			fmt.Printf("Warning: Failed to convert module %s to local source: %v\n", module.Name, err)
+			continue
+		}
+		allFilesToRestore = append(allFilesToRestore, filesToRestore...)
+	}
+
+	// Ensure cleanup happens regardless of outcome
+	defer func() {
+		if err := revertToRegistrySource(allFilesToRestore); err != nil {
+			fmt.Printf("Warning: Failed to revert files to registry source: %v\n", err)
+		}
+	}()
+
+	// Run terraform plan on all modules
+	for _, module := range modules {
+		if err := module.Plan(); err != nil {
+			return fmt.Errorf("terraform plan failed for module %s: %v", module.Name, err)
+		}
+		fmt.Printf("✓ Module %s planned successfully with local source\n", module.Name)
+	}
+
+	return nil
+}
+
 // parseExampleList parses a comma-separated list of examples
 func parseExampleList(example string) []string {
 	var examples []string
