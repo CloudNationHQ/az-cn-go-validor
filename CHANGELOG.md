@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.6.0...v1.7.0) (2025-08-29)
+
+
+### Features
+
+* implement interfaces and context aware patterns ([#34](https://github.com/CloudNationHQ/az-cn-go-validor/issues/34)) ([c2a2165](https://github.com/CloudNationHQ/az-cn-go-validor/commit/c2a21658263f39ca7e3f18da2664c8b4d3fc0832))
+
 ## [1.6.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.5.2...v1.6.0) (2025-08-29)
 
 
