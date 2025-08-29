@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.5.2...v1.6.0) (2025-08-29)
+
+
+### Features
+
+* remove the local plan functionality ([#32](https://github.com/CloudNationHQ/az-cn-go-validor/issues/32)) ([ca1275c](https://github.com/CloudNationHQ/az-cn-go-validor/commit/ca1275c15dec9b2bbf30ffa8925ada935d5b5ad5))
+
 ## [1.5.2](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.5.1...v1.5.2) (2025-08-29)
 
 
