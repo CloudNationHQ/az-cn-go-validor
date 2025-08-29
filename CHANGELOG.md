@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.2.0...v1.2.1) (2025-08-29)
+
+
+### Bug Fixes
+
+* fix path issues ([#19](https://github.com/CloudNationHQ/az-cn-go-validor/issues/19)) ([737289e](https://github.com/CloudNationHQ/az-cn-go-validor/commit/737289ec40156f90e50a671f1c657eec0c3d252d))
+
 ## [1.2.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.1.2...v1.2.0) (2025-08-29)
 
 
