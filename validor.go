@@ -231,7 +231,6 @@ func convertToLocalSource(modulePath, expectedModuleName string) ([]string, erro
 			moduleStart := parts[1]
 			moduleEnd := parts[3]
 
-			// Remove version line if present
 			moduleEnd = regexp.MustCompile(`(?m)^\s*version\s*=\s*"[^"]*"\s*\n?`).ReplaceAllString(moduleEnd, "")
 
 			return fmt.Sprintf(`%s"../../"%s`, moduleStart, moduleEnd)
