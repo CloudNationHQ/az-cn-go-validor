@@ -18,7 +18,7 @@ module "rg" {
 }
 
 module "network" {
-  source  = "cloudnationhq/validor/azure"
+  source  = "cloudnationhq/vnet/azure"
   version = "~> 9.0"
 
   naming = local.naming
