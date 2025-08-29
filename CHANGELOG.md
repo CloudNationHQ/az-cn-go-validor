@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.2.1...v1.3.0) (2025-08-29)
+
+
+### Features
+
+* instead of using file reverts fetch the latest module version through registry api calls ([#21](https://github.com/CloudNationHQ/az-cn-go-validor/issues/21)) ([6e6addc](https://github.com/CloudNationHQ/az-cn-go-validor/commit/6e6addc43d388b3ffca19f51f3864d87333a2ec8))
+
 ## [1.2.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.2.0...v1.2.1) (2025-08-29)
 
 
