@@ -34,6 +34,7 @@ type FileRestore struct {
 	Path            string
 	OriginalContent string
 	ModuleName      string
+	Provider        string
 }
 
 // TerraformRegistryResponse represents the API response structure
@@ -157,16 +158,16 @@ func TestApplyAllLocal(t *testing.T) {
 		t.Fatal(redError(errText))
 	}
 
-	// Get the expected module name from repository
-	expectedModuleName := extractModuleNameFromRepo()
-	if expectedModuleName == "" {
-		t.Fatal(redError("Could not determine module name from repository"))
+	// Get the expected module info from repository
+	moduleInfo := extractModuleInfoFromRepo()
+	if moduleInfo.Name == "" || moduleInfo.Provider == "" {
+		t.Fatal(redError("Could not determine module name and provider from repository"))
 	}
 
 	// Convert all modules to use local source
 	var allFilesToRestore []FileRestore
 	for _, module := range modules {
-		filesToRestore, err := convertToLocalSource(module.Path, expectedModuleName)
+		filesToRestore, err := convertToLocalSource(module.Path, moduleInfo)
 		if err != nil {
 			t.Logf("Warning: Failed to convert module %s to local source: %v", module.Name, err)
 			continue
@@ -195,12 +196,18 @@ func parseExampleList(example string) []string {
 	return examples
 }
 
-// extractModuleNameFromRepo extracts module name from repository name
-// Examples: terraform-azure-vnet -> vnet, terraform-azure-sql -> sql
-func extractModuleNameFromRepo() string {
+// ModuleInfo holds module and provider information
+type ModuleInfo struct {
+	Name     string
+	Provider string
+}
+
+// extractModuleInfoFromRepo extracts module name and provider from repository name
+// Examples: terraform-azure-vnet -> {vnet, azure}, terraform-azuread-groups -> {groups, azuread}
+func extractModuleInfoFromRepo() ModuleInfo {
 	wd, err := os.Getwd()
 	if err != nil {
-		return ""
+		return ModuleInfo{}
 	}
 
 	// If we're in tests directory, go up one level to get repo name
@@ -209,18 +216,21 @@ func extractModuleNameFromRepo() string {
 	}
 	repoName := filepath.Base(wd)
 
-	// Extract module name from terraform-azure-{MODULE} pattern
-	re := regexp.MustCompile(`^terraform-azure-(.+)$`)
-	if matches := re.FindStringSubmatch(repoName); len(matches) > 1 {
-		return matches[1]
+	// Extract module name and provider from terraform-{PROVIDER}-{MODULE} pattern
+	re := regexp.MustCompile(`^terraform-([^-]+)-(.+)$`)
+	if matches := re.FindStringSubmatch(repoName); len(matches) > 2 {
+		return ModuleInfo{
+			Name:     matches[2], // MODULE part
+			Provider: matches[1], // PROVIDER part
+		}
 	}
 
 	// If pattern doesn't match, return empty (will cause test to fail with clear error)
-	return ""
+	return ModuleInfo{}
 }
 
 // convertToLocalSource converts module blocks in Terraform files to use local source
-func convertToLocalSource(modulePath, expectedModuleName string) ([]FileRestore, error) {
+func convertToLocalSource(modulePath string, moduleInfo ModuleInfo) ([]FileRestore, error) {
 	var filesToRestore []FileRestore
 
 	// Find all .tf files in the module path
@@ -229,7 +239,7 @@ func convertToLocalSource(modulePath, expectedModuleName string) ([]FileRestore,
 		return nil, err
 	}
 
-	modulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"cloudnationhq/%s/azure"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`, expectedModuleName)
+	modulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"cloudnationhq/%s/%s"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`, moduleInfo.Name, moduleInfo.Provider)
 	re := regexp.MustCompile(modulePattern)
 
 	for _, file := range files {
@@ -266,7 +276,8 @@ func convertToLocalSource(modulePath, expectedModuleName string) ([]FileRestore,
 			filesToRestore = append(filesToRestore, FileRestore{
 				Path:            file,
 				OriginalContent: originalContent,
-				ModuleName:      expectedModuleName,
+				ModuleName:      moduleInfo.Name,
+				Provider:        moduleInfo.Provider,
 			})
 		}
 	}
@@ -311,7 +322,7 @@ func getLatestModuleVersion(namespace, name, provider string) (string, error) {
 func revertToRegistrySource(filesToRestore []FileRestore) error {
 	for _, restore := range filesToRestore {
 		// Get latest version from registry
-		latestVersion, err := getLatestModuleVersion("cloudnationhq", restore.ModuleName, "azure")
+		latestVersion, err := getLatestModuleVersion("cloudnationhq", restore.ModuleName, restore.Provider)
 		if err != nil {
 			// If we can't get the latest version, fall back to original content
 			if writeErr := os.WriteFile(restore.Path, []byte(restore.OriginalContent), 0644); writeErr != nil {
