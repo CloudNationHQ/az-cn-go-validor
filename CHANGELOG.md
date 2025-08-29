@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.5.0...v1.5.1) (2025-08-29)
+
+
+### Bug Fixes
+
+* fix plan output validation ([#28](https://github.com/CloudNationHQ/az-cn-go-validor/issues/28)) ([aa26be0](https://github.com/CloudNationHQ/az-cn-go-validor/commit/aa26be060e0202e310320a99490a098c722cd524))
+
 ## [1.5.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.4.0...v1.5.0) (2025-08-29)
 
 
