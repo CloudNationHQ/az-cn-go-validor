@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.1.2...v1.2.0) (2025-08-29)
+
+
+### Features
+
+* add sequential and local test functions ([#16](https://github.com/CloudNationHQ/az-cn-go-validor/issues/16)) ([e370dd4](https://github.com/CloudNationHQ/az-cn-go-validor/commit/e370dd47f4a38ca3344af88efaa932927141057e))
+
 ## [1.1.2](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.1.1...v1.1.2) (2025-08-14)
 
 
