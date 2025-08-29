@@ -42,8 +42,9 @@ func NewModule(name, path string) *Module {
 		Name: name,
 		Path: path,
 		Options: &terraform.Options{
-			TerraformDir: path,
-			NoColor:      true,
+			TerraformDir:    path,
+			NoColor:         true,
+			TerraformBinary: "terraform",
 		},
 		Errors:      []string{},
 		ApplyFailed: false,
