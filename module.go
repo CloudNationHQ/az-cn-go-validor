@@ -92,6 +92,15 @@ func (m *Module) Apply(t *testing.T) error {
 	return nil
 }
 
+// Plan validates a Terraform module without applying changes
+func (m *Module) Plan() error {
+	_, err := terraform.InitAndPlanE(nil, m.Options)
+	if err != nil {
+		return fmt.Errorf("terraform plan failed for module %s: %w", m.Name, err)
+	}
+	return nil
+}
+
 // Destroy tears down a deployed Terraform module
 func (m *Module) Destroy(t *testing.T) error {
 	t.Helper()
