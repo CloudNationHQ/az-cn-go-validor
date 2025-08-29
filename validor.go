@@ -182,10 +182,14 @@ func parseExampleList(example string) []string {
 // extractModuleNameFromRepo extracts module name from repository name
 // Examples: terraform-azure-vnet -> vnet, terraform-azure-sql -> sql
 func extractModuleNameFromRepo() string {
-	// Get current working directory name (repository name)
 	wd, err := os.Getwd()
 	if err != nil {
 		return ""
+	}
+
+	// If we're in tests directory, go up one level to get repo name
+	if filepath.Base(wd) == "tests" {
+		wd = filepath.Dir(wd)
 	}
 	repoName := filepath.Base(wd)
 
