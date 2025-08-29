@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.4.0...v1.5.0) (2025-08-29)
+
+
+### Features
+
+* add validation for local modules plan only ([#26](https://github.com/CloudNationHQ/az-cn-go-validor/issues/26)) ([73aa284](https://github.com/CloudNationHQ/az-cn-go-validor/commit/73aa2848fad6f219534bea6952fc78ddf855424d))
+
 ## [1.4.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.3.0...v1.4.0) (2025-08-29)
 
 
