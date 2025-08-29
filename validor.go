@@ -4,13 +4,17 @@
 package validor
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -23,6 +27,20 @@ type Config struct {
 	Exception     string
 	Example       string
 	ExceptionList map[string]bool
+}
+
+// FileRestore holds information needed to restore a file
+type FileRestore struct {
+	Path            string
+	OriginalContent string
+	ModuleName      string
+}
+
+// TerraformRegistryResponse represents the API response structure
+type TerraformRegistryResponse struct {
+	Versions []struct {
+		Version string `json:"version"`
+	} `json:"versions"`
 }
 
 // init registers flags before the test framework parses command line arguments
@@ -146,22 +164,20 @@ func TestApplyAllLocal(t *testing.T) {
 	}
 
 	// Convert all modules to use local source
-	var modifiedFiles []string
+	var allFilesToRestore []FileRestore
 	for _, module := range modules {
-		files, err := convertToLocalSource(module.Path, expectedModuleName)
+		filesToRestore, err := convertToLocalSource(module.Path, expectedModuleName)
 		if err != nil {
 			t.Logf("Warning: Failed to convert module %s to local source: %v", module.Name, err)
 			continue
 		}
-		modifiedFiles = append(modifiedFiles, files...)
+		allFilesToRestore = append(allFilesToRestore, filesToRestore...)
 	}
 
 	// Ensure cleanup happens regardless of test outcome
 	t.Cleanup(func() {
-		for _, file := range modifiedFiles {
-			if err := revertLocalSource(file); err != nil {
-				t.Logf("Warning: Failed to revert %s: %v", file, err)
-			}
+		if err := revertToRegistrySource(allFilesToRestore); err != nil {
+			t.Logf("Warning: Failed to revert files to registry source: %v", err)
 		}
 	})
 
@@ -204,8 +220,8 @@ func extractModuleNameFromRepo() string {
 }
 
 // convertToLocalSource converts module blocks in Terraform files to use local source
-func convertToLocalSource(modulePath, expectedModuleName string) ([]string, error) {
-	var modifiedFiles []string
+func convertToLocalSource(modulePath, expectedModuleName string) ([]FileRestore, error) {
+	var filesToRestore []FileRestore
 
 	// Find all .tf files in the module path
 	files, err := filepath.Glob(filepath.Join(modulePath, "*.tf"))
@@ -241,39 +257,81 @@ func convertToLocalSource(modulePath, expectedModuleName string) ([]string, erro
 		})
 
 		if newContent != originalContent {
-			// Create backup
-			backupFile := file + ".backup"
-			if err := os.WriteFile(backupFile, content, 0644); err != nil {
-				return modifiedFiles, err
-			}
-
 			// Write modified content
 			if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
-				return modifiedFiles, err
+				return filesToRestore, err
 			}
 
-			modifiedFiles = append(modifiedFiles, file)
+			// Store restoration info
+			filesToRestore = append(filesToRestore, FileRestore{
+				Path:            file,
+				OriginalContent: originalContent,
+				ModuleName:      expectedModuleName,
+			})
 		}
 	}
 
-	return modifiedFiles, nil
+	return filesToRestore, nil
 }
 
-// revertLocalSource reverts a file from its backup
-func revertLocalSource(file string) error {
-	backupFile := file + ".backup"
+// getLatestModuleVersion fetches the latest version from Terraform Registry
+func getLatestModuleVersion(namespace, name, provider string) (string, error) {
+	url := fmt.Sprintf("https://registry.terraform.io/v1/modules/%s/%s/%s/versions", namespace, name, provider)
 
-	// Read backup content
-	content, err := os.ReadFile(backupFile)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
 	if err != nil {
-		return err
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to fetch module versions: HTTP %d", resp.StatusCode)
 	}
 
-	// Restore original content
-	if err := os.WriteFile(file, content, 0644); err != nil {
-		return err
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
 	}
 
-	// Remove backup file
-	return os.Remove(backupFile)
+	var registryResp TerraformRegistryResponse
+	if err := json.Unmarshal(body, &registryResp); err != nil {
+		return "", err
+	}
+
+	if len(registryResp.Versions) == 0 {
+		return "", fmt.Errorf("no versions found for module")
+	}
+
+	// Return the latest version (first in the list)
+	return registryResp.Versions[0].Version, nil
+}
+
+// revertToRegistrySource reverts files back to registry source with latest version
+func revertToRegistrySource(filesToRestore []FileRestore) error {
+	for _, restore := range filesToRestore {
+		// Get latest version from registry
+		latestVersion, err := getLatestModuleVersion("cloudnationhq", restore.ModuleName, "azure")
+		if err != nil {
+			// If we can't get the latest version, fall back to original content
+			if writeErr := os.WriteFile(restore.Path, []byte(restore.OriginalContent), 0644); writeErr != nil {
+				return writeErr
+			}
+			continue
+		}
+
+		// Create updated content with latest version
+		updatedContent := restore.OriginalContent
+
+		// Update version if it exists in original content
+		versionRegex := regexp.MustCompile(`(version\s*=\s*")[^"]*(")`)
+		if versionRegex.MatchString(updatedContent) {
+			updatedContent = versionRegex.ReplaceAllString(updatedContent, fmt.Sprintf("${1}~> %s${2}", latestVersion))
+		}
+
+		if err := os.WriteFile(restore.Path, []byte(updatedContent), 0644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
