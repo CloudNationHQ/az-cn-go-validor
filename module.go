@@ -1,6 +1,7 @@
 package validor
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,7 +77,7 @@ func (mm *ModuleManager) DiscoverModules() ([]*Module, error) {
 }
 
 // Apply deploys a Terraform module
-func (m *Module) Apply(t *testing.T) error {
+func (m *Module) Apply(ctx context.Context, t *testing.T) error {
 	t.Helper()
 
 	t.Logf("Applying Terraform module: %s", m.Name)
@@ -94,7 +95,7 @@ func (m *Module) Apply(t *testing.T) error {
 }
 
 // Destroy tears down a deployed Terraform module
-func (m *Module) Destroy(t *testing.T) error {
+func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 	t.Helper()
 
 	t.Logf("Destroying Terraform module: %s", m.Name)
@@ -107,7 +108,7 @@ func (m *Module) Destroy(t *testing.T) error {
 		t.Log(redError(wrappedErr.Error()))
 	}
 
-	if err := m.CleanupFiles(t); err != nil && !m.ApplyFailed {
+	if err := m.Cleanup(ctx, t); err != nil && !m.ApplyFailed {
 		wrappedErr := fmt.Errorf("cleanup failed for module %s: %w", m.Name, err)
 		m.Errors = append(m.Errors, wrappedErr.Error())
 		t.Log(redError(wrappedErr.Error()))
@@ -116,13 +117,19 @@ func (m *Module) Destroy(t *testing.T) error {
 	return destroyErr
 }
 
-// CleanupFiles removes Terraform-generated files after testing
-func (m *Module) CleanupFiles(t *testing.T) error {
+// Cleanup removes Terraform-generated files after testing
+func (m *Module) Cleanup(ctx context.Context, t *testing.T) error {
 	t.Helper()
 	t.Logf("Cleaning up in: %s", m.Options.TerraformDir)
 	filesToCleanup := []string{"*.terraform*", "*tfstate*", "*.lock.hcl"}
 
 	for _, pattern := range filesToCleanup {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		matches, err := filepath.Glob(filepath.Join(m.Options.TerraformDir, pattern))
 		if err != nil {
 			return fmt.Errorf("error matching pattern %s: %w", pattern, err)
