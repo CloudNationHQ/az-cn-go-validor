@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.3.0...v1.4.0) (2025-08-29)
+
+
+### Features
+
+* add issue and PR templates ([#23](https://github.com/CloudNationHQ/az-cn-go-validor/issues/23)) ([900ff55](https://github.com/CloudNationHQ/az-cn-go-validor/commit/900ff55bd69ef58202768924b3180d4740c1986c))
+* provider block is dynamic as well now ([#25](https://github.com/CloudNationHQ/az-cn-go-validor/issues/25)) ([1ae5dc8](https://github.com/CloudNationHQ/az-cn-go-validor/commit/1ae5dc8d73af91d91d686b34c42290dfd1906b87))
+
 ## [1.3.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.2.1...v1.3.0) (2025-08-29)
 
 
