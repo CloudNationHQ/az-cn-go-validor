@@ -23,7 +23,43 @@ type Config struct {
 	SkipDestroy   bool
 	Exception     string
 	Example       string
+	Local         bool
 	ExceptionList map[string]bool
+}
+
+// Option represents a functional option for Config
+type Option func(*Config)
+
+// WithSkipDestroy sets the skip destroy option
+func WithSkipDestroy(skip bool) Option {
+	return func(c *Config) { c.SkipDestroy = skip }
+}
+
+// WithException sets the exception list
+func WithException(exception string) Option {
+	return func(c *Config) {
+		c.Exception = exception
+		c.ParseExceptionList()
+	}
+}
+
+// WithExample sets the example list
+func WithExample(example string) Option {
+	return func(c *Config) { c.Example = example }
+}
+
+// WithLocal sets the local testing option
+func WithLocal(local bool) Option {
+	return func(c *Config) { c.Local = local }
+}
+
+// NewConfig creates a new Config with the provided options
+func NewConfig(opts ...Option) *Config {
+	config := &Config{}
+	for _, opt := range opts {
+		opt(config)
+	}
+	return config
 }
 
 // ModuleInfo holds module and provider information
@@ -53,6 +89,7 @@ func init() {
 	flag.BoolVar(&globalConfig.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
 	flag.StringVar(&globalConfig.Exception, "exception", "", "Comma-separated list of examples to exclude")
 	flag.StringVar(&globalConfig.Example, "example", "", "Specific example(s) to test (comma-separated)")
+	flag.BoolVar(&globalConfig.Local, "local", false, "Use local source for testing")
 }
 
 // GetConfig returns the global configuration instance
@@ -73,32 +110,129 @@ func (c *Config) ParseExceptionList() {
 
 // TestApplyNoError tests one or more specific Terraform modules
 func TestApplyNoError(t *testing.T) {
-	config := GetConfig()
-	config.ParseExceptionList()
-
+	config := setupConfig()
 	if config.Example == "" {
 		t.Fatal(redError("-example flag is not set"))
 	}
+	runTestsWithConfig(t, config, parseExampleList(config.Example), config.Local)
+}
 
-	exampleList := parseExampleList(config.Example)
+// TestApplyAllParallel tests all Terraform modules in parallel
+func TestApplyAllParallel(t *testing.T) {
+	config := setupConfig()
+	modules := discoverModules(t, config)
+	RunTests(t, modules, true, config)
+}
+
+// TestApplyAllSequential tests all Terraform modules sequentially
+func TestApplyAllSequential(t *testing.T) {
+	config := setupConfig()
+	modules := discoverModules(t, config)
+	RunTests(t, modules, false, config)
+}
+
+// TestApplyAllLocal tests all Terraform modules with local source paths
+func TestApplyAllLocal(t *testing.T) {
+	config := setupConfig()
+	modules := discoverModules(t, config)
+	moduleNames := extractModuleNames(modules)
+	runTestsWithConfig(t, config, moduleNames, true)
+}
+
+// TestOption represents a functional option for test execution
+type TestOption func(*TestConfig)
+
+// TestConfig holds test execution configuration
+type TestConfig struct {
+	Config      *Config
+	ModuleNames []string
+	UseLocal    bool
+	Parallel    bool
+}
+
+// WithConfig sets the validor configuration
+func WithConfig(config *Config) TestOption {
+	return func(tc *TestConfig) { tc.Config = config }
+}
+
+// WithModules sets the module names to test
+func WithModules(moduleNames []string) TestOption {
+	return func(tc *TestConfig) { tc.ModuleNames = moduleNames }
+}
+
+// WithLocalSource enables local source testing
+func WithLocalSource(useLocal bool) TestOption {
+	return func(tc *TestConfig) { tc.UseLocal = useLocal }
+}
+
+// WithParallel enables parallel test execution
+func WithParallel(parallel bool) TestOption {
+	return func(tc *TestConfig) { tc.Parallel = parallel }
+}
+
+// RunTestsWithOptions executes tests with the provided options
+func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
+	tc := &TestConfig{
+		Parallel: true, // default to parallel
+	}
+	
+	for _, opt := range opts {
+		opt(tc)
+	}
+	
+	if tc.Config == nil {
+		tc.Config = GetConfig()
+		tc.Config.ParseExceptionList()
+	}
+	
+	runTestsWithConfig(t, tc.Config, tc.ModuleNames, tc.UseLocal)
+}
+
+// runTestsWithConfig runs tests for specific modules with optional local source conversion
+func runTestsWithConfig(t *testing.T, config *Config, moduleNames []string, useLocal bool) {
+	ctx := context.Background()
 	results := NewTestResults()
+	
+	var converter SourceConverter
+	var allFilesToRestore []FileRestore
 
-	for _, ex := range exampleList {
-		if config.ExceptionList[ex] {
-			t.Logf("Skipping example %s as it is in the exception list", ex)
+	// Setup local source conversion if requested
+	if useLocal {
+		moduleInfo := extractModuleInfoFromRepo()
+		if moduleInfo.Name == "" || moduleInfo.Provider == "" {
+			t.Fatal(redError("Could not determine module name and provider from repository"))
+		}
+
+		converter = NewSourceConverter(NewRegistryClient())
+		allFilesToRestore = convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo)
+
+		// Ensure cleanup happens regardless of test outcome
+		t.Cleanup(func() {
+			if err := converter.RevertToRegistry(context.Background(), allFilesToRestore); err != nil {
+				t.Logf("Warning: Failed to revert files to registry source: %v", err)
+			}
+		})
+	}
+
+	// Run tests for each module
+	for _, moduleName := range moduleNames {
+		if config.ExceptionList[moduleName] {
+			t.Logf("Skipping example %s as it is in the exception list", moduleName)
 			continue
 		}
 
-		t.Run(ex, func(t *testing.T) {
+		t.Run(moduleName, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			modulePath := filepath.Join("..", "examples", ex)
-			module := NewModule(ex, modulePath)
+			modulePath := filepath.Join("..", "examples", moduleName)
+			module := NewModule(moduleName, modulePath)
+
+			sourceType := map[bool]string{true: "local", false: "registry"}[useLocal]
 
 			if err := module.Apply(ctx, t); err != nil {
 				t.Fail()
 			} else {
-				t.Logf("✓ Module %s applied successfully", module.Name)
+				t.Logf("✓ Module %s applied successfully with %s source", module.Name, sourceType)
 			}
 
 			if !config.SkipDestroy {
@@ -117,27 +251,15 @@ func TestApplyNoError(t *testing.T) {
 	})
 }
 
-// TestApplyAllParallel tests all Terraform modules in parallel
-func TestApplyAllParallel(t *testing.T) {
+// setupConfig initializes and returns the global configuration
+func setupConfig() *Config {
 	config := GetConfig()
 	config.ParseExceptionList()
-
-	manager := NewModuleManager(filepath.Join("..", "examples"))
-	manager.SetConfig(config)
-	modules, err := manager.DiscoverModules()
-	if err != nil {
-		errText := fmt.Sprintf("Failed to discover modules: %v", err)
-		t.Fatal(redError(errText))
-	}
-
-	RunTests(t, modules, true, config)
+	return config
 }
 
-// TestApplyAllSequential tests all Terraform modules sequentially
-func TestApplyAllSequential(t *testing.T) {
-	config := GetConfig()
-	config.ParseExceptionList()
-
+// discoverModules discovers all modules in the examples directory
+func discoverModules(t *testing.T, config *Config) []*Module {
 	manager := NewModuleManager(filepath.Join("..", "examples"))
 	manager.SetConfig(config)
 	modules, err := manager.DiscoverModules()
@@ -145,51 +267,37 @@ func TestApplyAllSequential(t *testing.T) {
 		errText := fmt.Sprintf("Failed to discover modules: %v", err)
 		t.Fatal(redError(errText))
 	}
-
-	RunTests(t, modules, false, config)
+	return modules
 }
 
-// TestApplyAllLocal tests all Terraform modules with local source paths
-func TestApplyAllLocal(t *testing.T) {
-	ctx := context.Background()
-	config := GetConfig()
-	config.ParseExceptionList()
-
-	manager := NewModuleManager(filepath.Join("..", "examples"))
-	manager.SetConfig(config)
-	modules, err := manager.DiscoverModules()
-	if err != nil {
-		errText := fmt.Sprintf("Failed to discover modules: %v", err)
-		t.Fatal(redError(errText))
-	}
-
-	// Get the expected module info from repository
-	moduleInfo := extractModuleInfoFromRepo()
-	if moduleInfo.Name == "" || moduleInfo.Provider == "" {
-		t.Fatal(redError("Could not determine module name and provider from repository"))
-	}
-
-	// Create converter with registry client
-	converter := NewSourceConverter(NewRegistryClient())
-
-	// Convert all modules to use local source
-	var allFilesToRestore []FileRestore
+// extractModuleNames extracts module names from discovered modules
+func extractModuleNames(modules []*Module) []string {
+	var moduleNames []string
 	for _, module := range modules {
-		filesToRestore, err := converter.ConvertToLocal(ctx, module.Path, moduleInfo)
+		moduleNames = append(moduleNames, module.Name)
+	}
+	return moduleNames
+}
+
+// convertModulesToLocal converts specified modules to local source paths
+func convertModulesToLocal(ctx context.Context, t *testing.T, converter SourceConverter, moduleNames []string, exceptionList map[string]bool, moduleInfo ModuleInfo) []FileRestore {
+	var allFilesToRestore []FileRestore
+	
+	for _, moduleName := range moduleNames {
+		if exceptionList[moduleName] {
+			continue
+		}
+
+		modulePath := filepath.Join("..", "examples", moduleName)
+		filesToRestore, err := converter.ConvertToLocal(ctx, modulePath, moduleInfo)
 		if err != nil {
-			t.Logf("Warning: Failed to convert module %s to local source: %v", module.Name, err)
+			t.Logf("Warning: Failed to convert module %s to local source: %v", moduleName, err)
 			continue
 		}
 		allFilesToRestore = append(allFilesToRestore, filesToRestore...)
 	}
-
-	t.Cleanup(func() {
-		if err := converter.RevertToRegistry(context.Background(), allFilesToRestore); err != nil {
-			t.Logf("Warning: Failed to revert files to registry source: %v", err)
-		}
-	})
-
-	RunTests(t, modules, true, config)
+	
+	return allFilesToRestore
 }
 
 // parseExampleList parses a comma-separated list of examples
