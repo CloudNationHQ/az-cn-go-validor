@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.7.0...v1.8.0) (2025-09-09)
+
+
+### Features
+
+* refactor test functions with functional options and eliminate duplicate code ([#36](https://github.com/CloudNationHQ/az-cn-go-validor/issues/36)) ([34998a0](https://github.com/CloudNationHQ/az-cn-go-validor/commit/34998a04f3474e154e51bd9d121d344f77ee2af9))
+
 ## [1.7.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.6.0...v1.7.0) (2025-08-29)
 
 
