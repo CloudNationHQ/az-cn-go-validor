@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.8.0...v1.8.1) (2025-09-12)
+
+
+### Bug Fixes
+
+* improve cross-platform repository name extraction using git remote ([#38](https://github.com/CloudNationHQ/az-cn-go-validor/issues/38)) ([ca2fb26](https://github.com/CloudNationHQ/az-cn-go-validor/commit/ca2fb262c7849bed614762483f090835adf26f1c))
+
 ## [1.8.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.7.0...v1.8.0) (2025-09-09)
 
 
