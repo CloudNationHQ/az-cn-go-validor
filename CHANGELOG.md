@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.8.1...v1.9.0) (2025-09-12)
+
+
+### Features
+
+* consolidate test logic, modernize codebase, added configurable namespaces and improved error handling ([#40](https://github.com/CloudNationHQ/az-cn-go-validor/issues/40)) ([31b173c](https://github.com/CloudNationHQ/az-cn-go-validor/commit/31b173c8d1e7a9098572837391f63ce22ca4a96b))
+
 ## [1.8.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.8.0...v1.8.1) (2025-09-12)
 
 
