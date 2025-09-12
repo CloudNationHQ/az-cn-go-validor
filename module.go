@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
@@ -64,7 +65,7 @@ func (mm *ModuleManager) DiscoverModules() ([]*Module, error) {
 	for _, entry := range entries {
 		if entry.IsDir() {
 			moduleName := entry.Name()
-			if mm.Config != nil && mm.Config.ExceptionList[moduleName] {
+			if mm.Config != nil && slices.Contains(mm.Config.ExceptionList, moduleName) {
 				fmt.Printf("Skipping module %s as it is in the exception list\n", moduleName)
 				continue
 			}
@@ -86,7 +87,7 @@ func (m *Module) Apply(ctx context.Context, t *testing.T) error {
 	_, err := terraform.InitAndApplyE(t, m.Options)
 	if err != nil {
 		m.ApplyFailed = true
-		wrappedErr := fmt.Errorf("terraform apply failed for module %s: %w", m.Name, err)
+		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform apply", Err: err}
 		m.Errors = append(m.Errors, wrappedErr.Error())
 		t.Log(redError(wrappedErr.Error()))
 		return wrappedErr
@@ -103,13 +104,13 @@ func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 	_, destroyErr := terraform.DestroyE(t, m.Options)
 
 	if destroyErr != nil && !m.ApplyFailed {
-		wrappedErr := fmt.Errorf("terraform destroy failed for module %s: %w", m.Name, destroyErr)
+		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform destroy", Err: destroyErr}
 		m.Errors = append(m.Errors, wrappedErr.Error())
 		t.Log(redError(wrappedErr.Error()))
 	}
 
 	if err := m.Cleanup(ctx, t); err != nil && !m.ApplyFailed {
-		wrappedErr := fmt.Errorf("cleanup failed for module %s: %w", m.Name, err)
+		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "cleanup", Err: err}
 		m.Errors = append(m.Errors, wrappedErr.Error())
 		t.Log(redError(wrappedErr.Error()))
 	}

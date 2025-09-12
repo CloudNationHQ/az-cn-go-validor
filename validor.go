@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -25,7 +26,8 @@ type Config struct {
 	Exception     string
 	Example       string
 	Local         bool
-	ExceptionList map[string]bool
+	ExceptionList []string
+	Namespace     string
 }
 
 // Option represents a functional option for Config
@@ -63,27 +65,6 @@ func NewConfig(opts ...Option) *Config {
 	return config
 }
 
-// ModuleInfo holds module and provider information
-type ModuleInfo struct {
-	Name     string
-	Provider string
-}
-
-// FileRestore holds information needed to restore a file
-type FileRestore struct {
-	Path            string
-	OriginalContent string
-	ModuleName      string
-	Provider        string
-}
-
-// TerraformRegistryResponse represents the API response structure
-type TerraformRegistryResponse struct {
-	Versions []struct {
-		Version string `json:"version"`
-	} `json:"versions"`
-}
-
 // init registers flags before the test framework parses command line arguments
 func init() {
 	globalConfig = &Config{}
@@ -91,6 +72,7 @@ func init() {
 	flag.StringVar(&globalConfig.Exception, "exception", "", "Comma-separated list of examples to exclude")
 	flag.StringVar(&globalConfig.Example, "example", "", "Specific example(s) to test (comma-separated)")
 	flag.BoolVar(&globalConfig.Local, "local", false, "Use local source for testing")
+	flag.StringVar(&globalConfig.Namespace, "namespace", "cloudnationhq", "Terraform registry namespace")
 }
 
 // GetConfig returns the global configuration instance
@@ -98,14 +80,14 @@ func GetConfig() *Config {
 	return globalConfig
 }
 
-// ParseExceptionList converts a comma-separated list to a map
+// ParseExceptionList converts a comma-separated list to a slice
 func (c *Config) ParseExceptionList() {
-	c.ExceptionList = make(map[string]bool)
+	c.ExceptionList = []string{}
 	if c.Exception == "" {
 		return
 	}
 	for _, ex := range strings.FieldsFunc(c.Exception, func(r rune) bool { return r == ',' }) {
-		c.ExceptionList[strings.TrimSpace(ex)] = true
+		c.ExceptionList = append(c.ExceptionList, strings.TrimSpace(ex))
 	}
 }
 
@@ -115,7 +97,13 @@ func TestApplyNoError(t *testing.T) {
 	if config.Example == "" {
 		t.Fatal(redError("-example flag is not set"))
 	}
-	runTestsWithConfig(t, config, parseExampleList(config.Example), config.Local)
+	modules := createModulesFromNames(parseExampleList(config.Example), filepath.Join("..", "examples"))
+	sourceType := map[bool]string{true: "local", false: "registry"}[config.Local]
+	var setup TestSetupFunc
+	if config.Local {
+		setup = createLocalSetupFunc(config)
+	}
+	runModuleTests(t, modules, true, config, setup, sourceType)
 }
 
 // TestApplyAllParallel tests all Terraform modules in parallel
@@ -136,12 +124,14 @@ func TestApplyAllSequential(t *testing.T) {
 func TestApplyAllLocal(t *testing.T) {
 	config := setupConfig()
 	modules := discoverModules(t, config)
-	moduleNames := extractModuleNames(modules)
-	runTestsWithConfig(t, config, moduleNames, true)
+	runModuleTests(t, modules, true, config, createLocalSetupFunc(config), "local")
 }
 
 // TestOption represents a functional option for test execution
 type TestOption func(*TestConfig)
+
+// TestSetupFunc defines a function type for test setup operations
+type TestSetupFunc func(ctx context.Context, t *testing.T, modules []*Module) error
 
 // TestConfig holds test execution configuration
 type TestConfig struct {
@@ -186,49 +176,36 @@ func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 		tc.Config.ParseExceptionList()
 	}
 
-	runTestsWithConfig(t, tc.Config, tc.ModuleNames, tc.UseLocal)
+	modules := createModulesFromNames(tc.ModuleNames, filepath.Join("..", "examples"))
+	sourceType := map[bool]string{true: "local", false: "registry"}[tc.UseLocal]
+	var setup TestSetupFunc
+	if tc.UseLocal {
+		setup = createLocalSetupFunc(tc.Config)
+	}
+	runModuleTests(t, modules, tc.Parallel, tc.Config, setup, sourceType)
 }
 
-// runTestsWithConfig runs tests for specific modules with optional local source conversion
-func runTestsWithConfig(t *testing.T, config *Config, moduleNames []string, useLocal bool) {
+// runModuleTests executes tests for multiple modules with optional setup
+func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Config, setup TestSetupFunc, sourceType string) {
 	ctx := context.Background()
 	results := NewTestResults()
 
-	var converter SourceConverter
-	var allFilesToRestore []FileRestore
-
-	// Setup local source conversion if requested
-	if useLocal {
-		moduleInfo := extractModuleInfoFromRepo()
-		if moduleInfo.Name == "" || moduleInfo.Provider == "" {
-			t.Fatal(redError("Could not determine module name and provider from repository"))
+	if setup != nil {
+		if err := setup(ctx, t, modules); err != nil {
+			t.Fatal(redError(fmt.Sprintf("Setup failed: %v", err)))
 		}
-
-		converter = NewSourceConverter(NewRegistryClient())
-		allFilesToRestore = convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo)
-
-		// Ensure cleanup happens regardless of test outcome
-		t.Cleanup(func() {
-			if err := converter.RevertToRegistry(context.Background(), allFilesToRestore); err != nil {
-				t.Logf("Warning: Failed to revert files to registry source: %v", err)
-			}
-		})
 	}
 
-	// Run tests for each module
-	for _, moduleName := range moduleNames {
-		if config.ExceptionList[moduleName] {
-			t.Logf("Skipping example %s as it is in the exception list", moduleName)
+	for _, module := range modules {
+		if slices.Contains(config.ExceptionList, module.Name) {
+			t.Logf("Skipping example %s as it is in the exception list", module.Name)
 			continue
 		}
 
-		t.Run(moduleName, func(t *testing.T) {
-			t.Parallel()
-			ctx := context.Background()
-			modulePath := filepath.Join("..", "examples", moduleName)
-			module := NewModule(moduleName, modulePath)
-
-			sourceType := map[bool]string{true: "local", false: "registry"}[useLocal]
+		t.Run(module.Name, func(t *testing.T) {
+			if parallel {
+				t.Parallel()
+			}
 
 			if err := module.Apply(ctx, t); err != nil {
 				t.Fail()
@@ -280,12 +257,22 @@ func extractModuleNames(modules []*Module) []string {
 	return moduleNames
 }
 
+// createModulesFromNames creates modules from a list of names
+func createModulesFromNames(moduleNames []string, basePath string) []*Module {
+	var modules []*Module
+	for _, name := range moduleNames {
+		path := filepath.Join(basePath, name)
+		modules = append(modules, NewModule(name, path))
+	}
+	return modules
+}
+
 // convertModulesToLocal converts specified modules to local source paths
-func convertModulesToLocal(ctx context.Context, t *testing.T, converter SourceConverter, moduleNames []string, exceptionList map[string]bool, moduleInfo ModuleInfo) []FileRestore {
+func convertModulesToLocal(ctx context.Context, t *testing.T, converter SourceConverter, moduleNames []string, exceptionList []string, moduleInfo ModuleInfo) []FileRestore {
 	var allFilesToRestore []FileRestore
 
 	for _, moduleName := range moduleNames {
-		if exceptionList[moduleName] {
+		if slices.Contains(exceptionList, moduleName) {
 			continue
 		}
 
@@ -299,6 +286,29 @@ func convertModulesToLocal(ctx context.Context, t *testing.T, converter SourceCo
 	}
 
 	return allFilesToRestore
+}
+
+// createLocalSetupFunc creates a setup function for local source testing
+func createLocalSetupFunc(config *Config) TestSetupFunc {
+	return func(ctx context.Context, t *testing.T, modules []*Module) error {
+		moduleInfo := extractModuleInfoFromRepo()
+		if moduleInfo.Name == "" || moduleInfo.Provider == "" {
+			return fmt.Errorf("could not determine module name and provider from repository")
+		}
+		moduleInfo.Namespace = config.Namespace
+
+		converter := NewSourceConverter(NewRegistryClient())
+		moduleNames := extractModuleNames(modules)
+		allFilesToRestore := convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo)
+
+		// Ensure cleanup happens regardless of test outcome
+		t.Cleanup(func() {
+			if err := converter.RevertToRegistry(context.Background(), allFilesToRestore); err != nil {
+				t.Logf("Warning: Failed to revert files to registry source: %v", err)
+			}
+		})
+		return nil
+	}
 }
 
 // parseExampleList parses a comma-separated list of examples
