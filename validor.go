@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -175,16 +176,16 @@ func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 	tc := &TestConfig{
 		Parallel: true, // default to parallel
 	}
-	
+
 	for _, opt := range opts {
 		opt(tc)
 	}
-	
+
 	if tc.Config == nil {
 		tc.Config = GetConfig()
 		tc.Config.ParseExceptionList()
 	}
-	
+
 	runTestsWithConfig(t, tc.Config, tc.ModuleNames, tc.UseLocal)
 }
 
@@ -192,7 +193,7 @@ func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 func runTestsWithConfig(t *testing.T, config *Config, moduleNames []string, useLocal bool) {
 	ctx := context.Background()
 	results := NewTestResults()
-	
+
 	var converter SourceConverter
 	var allFilesToRestore []FileRestore
 
@@ -282,7 +283,7 @@ func extractModuleNames(modules []*Module) []string {
 // convertModulesToLocal converts specified modules to local source paths
 func convertModulesToLocal(ctx context.Context, t *testing.T, converter SourceConverter, moduleNames []string, exceptionList map[string]bool, moduleInfo ModuleInfo) []FileRestore {
 	var allFilesToRestore []FileRestore
-	
+
 	for _, moduleName := range moduleNames {
 		if exceptionList[moduleName] {
 			continue
@@ -296,7 +297,7 @@ func convertModulesToLocal(ctx context.Context, t *testing.T, converter SourceCo
 		}
 		allFilesToRestore = append(allFilesToRestore, filesToRestore...)
 	}
-	
+
 	return allFilesToRestore
 }
 
@@ -321,8 +322,20 @@ func extractModuleInfoFromRepo() ModuleInfo {
 	if filepath.Base(wd) == "tests" {
 		wd = filepath.Dir(wd)
 	}
-	repoName := filepath.Base(wd)
 
+	// Try git remote first (works across platforms)
+	if repoName := getRepoNameFromGit(wd); repoName != "" {
+		re := regexp.MustCompile(`^terraform-([^-]+)-(.+)$`)
+		if matches := re.FindStringSubmatch(repoName); len(matches) > 2 {
+			return ModuleInfo{
+				Name:     matches[2],
+				Provider: matches[1],
+			}
+		}
+	}
+
+	// Fallback to directory name
+	repoName := filepath.Base(wd)
 	re := regexp.MustCompile(`^terraform-([^-]+)-(.+)$`)
 	if matches := re.FindStringSubmatch(repoName); len(matches) > 2 {
 		return ModuleInfo{
@@ -331,4 +344,22 @@ func extractModuleInfoFromRepo() ModuleInfo {
 		}
 	}
 	return ModuleInfo{}
+}
+
+func getRepoNameFromGit(dir string) string {
+	cmd := exec.Command("git", "remote", "get-url", "origin")
+	cmd.Dir = dir
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	url := strings.TrimSpace(string(output))
+	// Extract repo name from URL like https://github.com/owner/terraform-azure-aks.git
+	parts := strings.Split(url, "/")
+	if len(parts) > 0 {
+		repoName := parts[len(parts)-1]
+		return strings.TrimSuffix(repoName, ".git")
+	}
+	return ""
 }
