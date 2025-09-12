@@ -30,8 +30,8 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 		return nil, fmt.Errorf("failed to find terraform files: %w", err)
 	}
 
-	modulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"cloudnationhq/%s/%s"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`, 
-		moduleInfo.Name, moduleInfo.Provider)
+	modulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"%s/%s/%s"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`,
+		regexp.QuoteMeta(moduleInfo.Namespace), regexp.QuoteMeta(moduleInfo.Name), regexp.QuoteMeta(moduleInfo.Provider))
 	re := regexp.MustCompile(modulePattern)
 
 	for _, file := range files {
@@ -59,6 +59,7 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 				OriginalContent: originalContent,
 				ModuleName:      moduleInfo.Name,
 				Provider:        moduleInfo.Provider,
+				Namespace:       moduleInfo.Namespace,
 			})
 		}
 	}
@@ -95,7 +96,7 @@ func (c *DefaultSourceConverter) RevertToRegistry(ctx context.Context, filesToRe
 		}
 
 		// Get latest version from registry
-		latestVersion, err := c.registryClient.GetLatestVersion(ctx, "cloudnationhq", restore.ModuleName, restore.Provider)
+		latestVersion, err := c.registryClient.GetLatestVersion(ctx, restore.Namespace, restore.ModuleName, restore.Provider)
 		if err != nil {
 			// If we can't get the latest version, fall back to original content
 			if writeErr := os.WriteFile(restore.Path, []byte(restore.OriginalContent), 0644); writeErr != nil {
@@ -106,7 +107,7 @@ func (c *DefaultSourceConverter) RevertToRegistry(ctx context.Context, filesToRe
 
 		// Create updated content with latest version
 		updatedContent := c.updateVersionInContent(restore.OriginalContent, latestVersion)
-		
+
 		if err := os.WriteFile(restore.Path, []byte(updatedContent), 0644); err != nil {
 			return fmt.Errorf("failed to write updated file %s: %w", restore.Path, err)
 		}

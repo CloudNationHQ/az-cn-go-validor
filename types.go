@@ -2,6 +2,7 @@ package validor
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 )
@@ -43,4 +44,42 @@ func (tr *TestResults) GetResults() ([]*Module, []*Module) {
 	tr.mu.RLock()
 	defer tr.mu.RUnlock()
 	return tr.modules, tr.failedModules
+}
+
+// ModuleInfo holds module and provider information
+type ModuleInfo struct {
+	Name      string
+	Provider  string
+	Namespace string
+}
+
+// FileRestore holds information needed to restore a file
+type FileRestore struct {
+	Path            string
+	OriginalContent string
+	ModuleName      string
+	Provider        string
+	Namespace       string
+}
+
+// TerraformRegistryResponse represents the API response structure
+type TerraformRegistryResponse struct {
+	Versions []struct {
+		Version string `json:"version"`
+	} `json:"versions"`
+}
+
+// ModuleError represents an error that occurred during module operations
+type ModuleError struct {
+	ModuleName string
+	Operation  string
+	Err        error
+}
+
+func (e *ModuleError) Error() string {
+	return fmt.Sprintf("%s failed for module %s: %v", e.Operation, e.ModuleName, e.Err)
+}
+
+func (e *ModuleError) Unwrap() error {
+	return e.Err
 }
