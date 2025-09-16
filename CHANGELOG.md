@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.10.0...v1.10.1) (2025-09-16)
+
+
+### Bug Fixes
+
+* fix submodule detection ([#44](https://github.com/CloudNationHQ/az-cn-go-validor/issues/44)) ([91f96bf](https://github.com/CloudNationHQ/az-cn-go-validor/commit/91f96bf81a096933054018d39be9f590d6c793c4))
+
 ## [1.10.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.9.0...v1.10.0) (2025-09-16)
 
 
