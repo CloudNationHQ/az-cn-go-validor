@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.10.1...v1.11.0) (2025-09-16)
+
+
+### Features
+
+* use hclwrite for terraform module source rewrites ([#46](https://github.com/CloudNationHQ/az-cn-go-validor/issues/46)) ([fee8830](https://github.com/CloudNationHQ/az-cn-go-validor/commit/fee8830c3499fc93bc74c43eaee23015c0b7dfe3))
+
 ## [1.10.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.10.0...v1.10.1) (2025-09-16)
 
 
