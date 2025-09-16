@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.9.0...v1.10.0) (2025-09-16)
+
+
+### Features
+
+* add submodule support when switching to local paths ([#42](https://github.com/CloudNationHQ/az-cn-go-validor/issues/42)) ([3063941](https://github.com/CloudNationHQ/az-cn-go-validor/commit/3063941951b45aac577c55b4acc6d4b7e2ee4439))
+
 ## [1.9.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.8.1...v1.9.0) (2025-09-12)
 
 
