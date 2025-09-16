@@ -10,7 +10,7 @@ Terraform modules can fail in production due to untested configurations, provide
 
 Manual testing is time-consuming and error-prone.
 
-Validor helps you:
+`Validor helps you:`
 
 Test modules in isolated environments before production.
 
@@ -40,7 +40,7 @@ Executes full Terraform apply/destroy cycles for real validation.
 
 Supports parallel and sequential execution modes.
 
-Handles local source testing for module development.
+Handles local source testing for module development, including submodules.
 
 Provides detailed error reporting with actionable feedback.
 
