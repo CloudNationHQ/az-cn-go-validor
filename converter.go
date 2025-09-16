@@ -33,8 +33,8 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 		regexp.QuoteMeta(moduleInfo.Namespace), regexp.QuoteMeta(moduleInfo.Name), regexp.QuoteMeta(moduleInfo.Provider))
 	re := regexp.MustCompile(modulePattern)
 
-	submodulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"%s/%s/%s//modules/([^"]*)"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`,
-		regexp.QuoteMeta(moduleInfo.Namespace), regexp.QuoteMeta(moduleInfo.Name), regexp.QuoteMeta(moduleInfo.Provider))
+	submodulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"%s/([^/]+)/%s//modules/([^"]*)"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`,
+		regexp.QuoteMeta(moduleInfo.Namespace), regexp.QuoteMeta(moduleInfo.Provider))
 	subRe := regexp.MustCompile(submodulePattern)
 
 	for _, file := range files {
@@ -99,8 +99,8 @@ func (c *DefaultSourceConverter) processSubmoduleContent(content string, re *reg
 		}
 
 		moduleStart := parts[1]
-		submoduleName := parts[4]
-		moduleEnd := parts[6]
+		submoduleName := parts[3]
+		moduleEnd := parts[5]
 
 		// Remove version line if present
 		versionRegex := regexp.MustCompile(`(?m)^\s*version\s*=\s*"[^"]*"\s*\n?`)
