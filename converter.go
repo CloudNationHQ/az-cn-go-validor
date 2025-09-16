@@ -6,6 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
 )
 
 // DefaultSourceConverter implements SourceConverter
@@ -29,13 +35,10 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 		return nil, fmt.Errorf("failed to find terraform files: %w", err)
 	}
 
-	modulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"%s/%s/%s"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`,
-		regexp.QuoteMeta(moduleInfo.Namespace), regexp.QuoteMeta(moduleInfo.Name), regexp.QuoteMeta(moduleInfo.Provider))
-	re := regexp.MustCompile(modulePattern)
-
-	submodulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"%s/([^/]+)/%s//modules/([^"]*)"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`,
+	moduleSource := fmt.Sprintf("%s/%s/%s", moduleInfo.Namespace, moduleInfo.Name, moduleInfo.Provider)
+	submodulePattern := fmt.Sprintf(`^%s/([^/]+)/%s//modules/(.*)$`,
 		regexp.QuoteMeta(moduleInfo.Namespace), regexp.QuoteMeta(moduleInfo.Provider))
-	subRe := regexp.MustCompile(submodulePattern)
+	submoduleRegex := regexp.MustCompile(submodulePattern)
 
 	for _, file := range files {
 		select {
@@ -50,64 +53,29 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 		}
 
 		originalContent := string(content)
-		newContent := c.processContent(originalContent, re)
-		newContent = c.processSubmoduleContent(newContent, subRe)
-
-		if newContent != originalContent {
-			if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
-				return filesToRestore, fmt.Errorf("failed to write file %s: %w", file, err)
-			}
-
-			filesToRestore = append(filesToRestore, FileRestore{
-				Path:            file,
-				OriginalContent: originalContent,
-				ModuleName:      moduleInfo.Name,
-				Provider:        moduleInfo.Provider,
-				Namespace:       moduleInfo.Namespace,
-			})
+		parsedFile, diags := hclwrite.ParseConfig(content, file, hcl.InitialPos)
+		if diags.HasErrors() {
+			return filesToRestore, fmt.Errorf("failed to parse %s: %s", file, diags.Error())
 		}
+
+		if !c.updateModuleBlocks(parsedFile.Body(), moduleSource, submoduleRegex) {
+			continue
+		}
+
+		if err := os.WriteFile(file, parsedFile.Bytes(), 0644); err != nil {
+			return filesToRestore, fmt.Errorf("failed to write file %s: %w", file, err)
+		}
+
+		filesToRestore = append(filesToRestore, FileRestore{
+			Path:            file,
+			OriginalContent: originalContent,
+			ModuleName:      moduleInfo.Name,
+			Provider:        moduleInfo.Provider,
+			Namespace:       moduleInfo.Namespace,
+		})
 	}
 
 	return filesToRestore, nil
-}
-
-// processContent replaces module source and removes version
-func (c *DefaultSourceConverter) processContent(content string, re *regexp.Regexp) string {
-	return re.ReplaceAllStringFunc(content, func(match string) string {
-		parts := re.FindStringSubmatch(match)
-		if len(parts) < 4 {
-			return match
-		}
-
-		moduleStart := parts[1]
-		moduleEnd := parts[3]
-
-		// Remove version line if present
-		versionRegex := regexp.MustCompile(`(?m)^\s*version\s*=\s*"[^"]*"\s*\n?`)
-		moduleEnd = versionRegex.ReplaceAllString(moduleEnd, "")
-
-		return fmt.Sprintf(`%s"../../"%s`, moduleStart, moduleEnd)
-	})
-}
-
-// processSubmoduleContent replaces submodule source and removes version
-func (c *DefaultSourceConverter) processSubmoduleContent(content string, re *regexp.Regexp) string {
-	return re.ReplaceAllStringFunc(content, func(match string) string {
-		parts := re.FindStringSubmatch(match)
-		if len(parts) < 6 {
-			return match
-		}
-
-		moduleStart := parts[1]
-		submoduleName := parts[3]
-		moduleEnd := parts[5]
-
-		// Remove version line if present
-		versionRegex := regexp.MustCompile(`(?m)^\s*version\s*=\s*"[^"]*"\s*\n?`)
-		moduleEnd = versionRegex.ReplaceAllString(moduleEnd, "")
-
-		return fmt.Sprintf(`%s"../../modules/%s"%s`, moduleStart, submoduleName, moduleEnd)
-	})
 }
 
 // RevertToRegistry reverts files back to registry source with latest version
@@ -146,4 +114,61 @@ func (c *DefaultSourceConverter) updateVersionInContent(content, latestVersion s
 		return versionRegex.ReplaceAllString(content, fmt.Sprintf("${1}~> %s${2}", latestVersion))
 	}
 	return content
+}
+
+func (c *DefaultSourceConverter) updateModuleBlocks(body *hclwrite.Body, moduleSource string, submoduleRegex *regexp.Regexp) bool {
+	changed := false
+	for _, block := range body.Blocks() {
+		if block.Type() == "module" && c.updateModuleBlock(block, moduleSource, submoduleRegex) {
+			changed = true
+		}
+		if c.updateModuleBlocks(block.Body(), moduleSource, submoduleRegex) {
+			changed = true
+		}
+	}
+	return changed
+}
+
+func (c *DefaultSourceConverter) updateModuleBlock(block *hclwrite.Block, moduleSource string, submoduleRegex *regexp.Regexp) bool {
+	attr := block.Body().GetAttribute("source")
+	if attr == nil {
+		return false
+	}
+
+	sourceValue, ok := attributeStringValue(attr)
+	if !ok {
+		return false
+	}
+
+	switch {
+	case sourceValue == moduleSource:
+		block.Body().SetAttributeValue("source", cty.StringVal("../../"))
+		block.Body().RemoveAttribute("version")
+		return true
+	case submoduleRegex != nil:
+		if matches := submoduleRegex.FindStringSubmatch(sourceValue); len(matches) == 3 {
+			localPath := fmt.Sprintf("../../modules/%s", strings.TrimPrefix(matches[2], "/"))
+			block.Body().SetAttributeValue("source", cty.StringVal(localPath))
+			block.Body().RemoveAttribute("version")
+			return true
+		}
+	}
+
+	return false
+}
+
+func attributeStringValue(attr *hclwrite.Attribute) (string, bool) {
+	tokens := attr.Expr().BuildTokens(nil)
+	if len(tokens) == 0 {
+		return "", false
+	}
+	raw := strings.TrimSpace(string(tokens.Bytes()))
+	if raw == "" {
+		return "", false
+	}
+	value, err := strconv.Unquote(raw)
+	if err != nil {
+		return "", false
+	}
+	return value, true
 }
