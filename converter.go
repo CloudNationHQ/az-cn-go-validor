@@ -24,7 +24,6 @@ func NewSourceConverter(client RegistryClient) SourceConverter {
 func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath string, moduleInfo ModuleInfo) ([]FileRestore, error) {
 	var filesToRestore []FileRestore
 
-	// Find all .tf files in the module path
 	files, err := filepath.Glob(filepath.Join(modulePath, "*.tf"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to find terraform files: %w", err)
@@ -33,6 +32,10 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 	modulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"%s/%s/%s"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`,
 		regexp.QuoteMeta(moduleInfo.Namespace), regexp.QuoteMeta(moduleInfo.Name), regexp.QuoteMeta(moduleInfo.Provider))
 	re := regexp.MustCompile(modulePattern)
+
+	submodulePattern := fmt.Sprintf(`(?m)^(\s*module\s+"[^"]*"\s*\{[^}]*source\s*=\s*)"%s/%s/%s//modules/([^"]*)"([^}]*version\s*=\s*"[^"]*")?([^}]*\})`,
+		regexp.QuoteMeta(moduleInfo.Namespace), regexp.QuoteMeta(moduleInfo.Name), regexp.QuoteMeta(moduleInfo.Provider))
+	subRe := regexp.MustCompile(submodulePattern)
 
 	for _, file := range files {
 		select {
@@ -48,6 +51,7 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 
 		originalContent := string(content)
 		newContent := c.processContent(originalContent, re)
+		newContent = c.processSubmoduleContent(newContent, subRe)
 
 		if newContent != originalContent {
 			if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
@@ -83,6 +87,26 @@ func (c *DefaultSourceConverter) processContent(content string, re *regexp.Regex
 		moduleEnd = versionRegex.ReplaceAllString(moduleEnd, "")
 
 		return fmt.Sprintf(`%s"../../"%s`, moduleStart, moduleEnd)
+	})
+}
+
+// processSubmoduleContent replaces submodule source and removes version
+func (c *DefaultSourceConverter) processSubmoduleContent(content string, re *regexp.Regexp) string {
+	return re.ReplaceAllStringFunc(content, func(match string) string {
+		parts := re.FindStringSubmatch(match)
+		if len(parts) < 6 {
+			return match
+		}
+
+		moduleStart := parts[1]
+		submoduleName := parts[4]
+		moduleEnd := parts[6]
+
+		// Remove version line if present
+		versionRegex := regexp.MustCompile(`(?m)^\s*version\s*=\s*"[^"]*"\s*\n?`)
+		moduleEnd = versionRegex.ReplaceAllString(moduleEnd, "")
+
+		return fmt.Sprintf(`%s"../../modules/%s"%s`, moduleStart, submoduleName, moduleEnd)
 	})
 }
 
