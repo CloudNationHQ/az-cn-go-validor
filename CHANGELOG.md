@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.11.0...v1.12.0) (2025-09-22)
+
+
+### Features
+
+* implement parity testing between registry and local module sources ([#48](https://github.com/CloudNationHQ/az-cn-go-validor/issues/48)) ([4db1184](https://github.com/CloudNationHQ/az-cn-go-validor/commit/4db118496affbe26f543fc3a3d61317f5aaf9fc6))
+
 ## [1.11.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.10.1...v1.11.0) (2025-09-16)
 
 
