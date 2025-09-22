@@ -14,6 +14,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
@@ -425,6 +426,10 @@ func runParityTest(t *testing.T, modules []*Module, config *Config) {
 		}
 		// Destroy all modules
 		for _, module := range modules {
+			terraform.WithDefaultRetryableErrors(t, module.Options)
+			if _, err := terraform.InitE(t, module.Options); err != nil {
+				t.Logf("cleanup init error for %s: %v", module.Name, err)
+			}
 			if err := module.Destroy(ctx, t); err != nil {
 				t.Logf("cleanup error for %s: %v", module.Name, err)
 			}
@@ -435,59 +440,87 @@ func runParityTest(t *testing.T, modules []*Module, config *Config) {
 	var (
 		modulesWithMajor []string
 		modulesWithMinor []string
+		planErrors       []string
 	)
+	var mu sync.Mutex
 
 	for _, module := range modules {
-		if slices.Contains(config.ExceptionList, module.Name) {
-			t.Logf("Skipping parity check for %s as it is in the exception list", module.Name)
-			continue
-		}
+		mod := module
+		t.Run(mod.Name+"_parity", func(t *testing.T) {
+			t.Parallel()
 
-		if module.ApplyFailed {
-			t.Logf("Skipping parity check for %s as registry apply failed", module.Name)
-			continue
-		}
-
-		planStruct, err := module.PlanWithStruct(t)
-		if err != nil {
-			t.Fatalf("failed to plan %s with local paths: %v", module.Name, err)
-		}
-
-		summary := summarizePlanChanges(planStruct)
-		moduleSummaries[module.Name] = summary
-
-		switch {
-		case summary.hasMajorDrift():
-			t.Logf("parity major drift: %s triggers replacements/destroys", module.Name)
-			if len(summary.ReplaceAddresses) > 0 {
-				t.Logf("  replacements: %v", summary.ReplaceAddresses)
+			if slices.Contains(config.ExceptionList, mod.Name) {
+				t.Logf("Skipping parity check for %s as it is in the exception list", mod.Name)
+				return
 			}
-			if len(summary.DestroyAddresses) > 0 {
-				t.Logf("  destroys: %v", summary.DestroyAddresses)
+
+			if mod.ApplyFailed {
+				t.Logf("Skipping parity check for %s as registry apply failed", mod.Name)
+				return
 			}
-			if len(summary.OtherAddresses) > 0 {
-				t.Logf("  other actions: %v", summary.OtherAddresses)
+
+			planStruct, err := mod.PlanWithStruct(t)
+			if err != nil {
+				t.Logf("parity error: failed to plan %s with local paths: %v", mod.Name, err)
+				mu.Lock()
+				planErrors = append(planErrors, fmt.Sprintf("%s: %v", mod.Name, err))
+				mu.Unlock()
+				return
 			}
-			modulesWithMajor = append(modulesWithMajor, module.Name)
-		case summary.hasChanges():
-			t.Logf("parity drift detected: %s has additions/updates only (adds=%d, updates=%d)", module.Name, summary.Adds, summary.Updates)
-			modulesWithMinor = append(modulesWithMinor, module.Name)
-		default:
-			t.Logf("parity confirmed: %s produces identical infrastructure with local paths", module.Name)
+
+			summary := summarizePlanChanges(planStruct)
+
+			mu.Lock()
+			moduleSummaries[mod.Name] = summary
+			switch {
+			case summary.hasMajorDrift():
+				modulesWithMajor = append(modulesWithMajor, mod.Name)
+			case summary.hasChanges():
+				modulesWithMinor = append(modulesWithMinor, mod.Name)
+			}
+			mu.Unlock()
+
+			switch {
+			case summary.hasMajorDrift():
+				t.Logf("parity major drift: %s triggers replacements/destroys", mod.Name)
+				if len(summary.ReplaceAddresses) > 0 {
+					t.Logf("  replacements: %v", summary.ReplaceAddresses)
+				}
+				if len(summary.DestroyAddresses) > 0 {
+					t.Logf("  destroys: %v", summary.DestroyAddresses)
+				}
+				if len(summary.OtherAddresses) > 0 {
+					t.Logf("  other actions: %v", summary.OtherAddresses)
+				}
+			case summary.hasChanges():
+				t.Logf("parity drift detected: %s has additions/updates only (adds=%d, updates=%d)", mod.Name, summary.Adds, summary.Updates)
+			default:
+				t.Logf("parity confirmed: %s produces identical infrastructure with local paths", mod.Name)
+			}
+		})
+	}
+
+	if len(planErrors) > 0 {
+		sort.Strings(planErrors)
+		t.Logf("parity check initialization errors:")
+		for _, errMsg := range planErrors {
+			t.Logf("- %s", errMsg)
 		}
+		t.Fatalf("registry and local modules failed to re-initialize for %d module(s)", len(planErrors))
 	}
 
 	if len(modulesWithMajor) > 0 {
-		t.Logf("parity check summary (major drift):")
+		sort.Strings(modulesWithMajor)
 		for _, moduleName := range modulesWithMajor {
 			summary := moduleSummaries[moduleName]
-			t.Logf("- %s: %d replacements, %d destroys", moduleName, summary.Replaces, summary.Deletes)
+			t.Logf("parity major drift: %s requires %d replacements and %d destroys", moduleName, summary.Replaces, summary.Deletes)
 		}
 		t.Logf("these changes will force resource recreation and require a major version bump")
 		t.Fatalf("registry and local modules are out of parity for %d module(s)", len(modulesWithMajor))
 	}
 
 	if len(modulesWithMinor) > 0 {
+		sort.Strings(modulesWithMinor)
 		t.Logf("parity drift summary (non-breaking): %v", modulesWithMinor)
 	}
 
