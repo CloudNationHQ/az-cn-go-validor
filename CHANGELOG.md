@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.0...v1.12.1) (2025-09-22)
+
+
+### Bug Fixes
+
+* fix parallel processing ([#50](https://github.com/CloudNationHQ/az-cn-go-validor/issues/50)) ([3a9a79b](https://github.com/CloudNationHQ/az-cn-go-validor/commit/3a9a79b2c4274f90286c9ea4a0439b741c7bcc93))
+
 ## [1.12.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.11.0...v1.12.0) (2025-09-22)
 
 
