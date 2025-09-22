@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.7](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.6...v1.12.7) (2025-09-22)
+
+
+### Bug Fixes
+
+* revert to v1.11.0 ([#63](https://github.com/CloudNationHQ/az-cn-go-validor/issues/63)) ([cb9f2a2](https://github.com/CloudNationHQ/az-cn-go-validor/commit/cb9f2a22533ec82bada05b9b8f483450e665a251))
+
 ## [1.11.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.10.1...v1.11.0) (2025-09-16)
 
 
