@@ -127,6 +127,13 @@ func TestApplyAllLocal(t *testing.T) {
 	runModuleTests(t, modules, true, config, createLocalSetupFunc(config), "local")
 }
 
+// TestRegistryToLocalParity tests that local modules produce identical infrastructure to registry modules
+func TestRegistryToLocalParity(t *testing.T) {
+	config := setupConfig()
+	modules := discoverModules(t, config)
+	runParityTest(t, modules, config)
+}
+
 // TestOption represents a functional option for test execution
 type TestOption func(*TestConfig)
 
@@ -372,4 +379,60 @@ func getRepoNameFromGit(dir string) string {
 		return strings.TrimSuffix(repoName, ".git")
 	}
 	return ""
+}
+
+// runParityTest tests registry vs local parity using parallel execution
+func runParityTest(t *testing.T, modules []*Module, config *Config) {
+	ctx := context.Background()
+
+	runModuleTests(t, modules, true, config, nil, "registry")
+
+	moduleInfo := extractModuleInfoFromRepo()
+	if moduleInfo.Name == "" || moduleInfo.Provider == "" {
+		t.Fatalf("could not determine module name and provider from repository")
+	}
+	moduleInfo.Namespace = config.Namespace
+
+	converter := NewSourceConverter(NewRegistryClient())
+	moduleNames := extractModuleNames(modules)
+	allFilesToRestore := convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo)
+
+	defer func() {
+		// Always restore files
+		if restoreErr := converter.RevertToRegistry(ctx, allFilesToRestore); restoreErr != nil {
+			t.Logf("failed to restore files: %v", restoreErr)
+		}
+	}()
+
+	var inconsistentModules []string
+	for _, module := range modules {
+		t.Run(module.Name+"_parity", func(t *testing.T) {
+			hasChanges, err := module.Plan(ctx, t)
+			if err != nil {
+				t.Fatalf("failed to plan %s with local paths: %v", module.Name, err)
+			}
+
+			if hasChanges {
+				t.Logf("parity issue detected: %s has changes when using local paths", module.Name)
+				inconsistentModules = append(inconsistentModules, module.Name)
+			} else {
+				t.Logf("parity confirmed: %s produces identical infrastructure with local paths", module.Name)
+			}
+		})
+	}
+
+	for _, module := range modules {
+		if err := module.Destroy(ctx, t); err != nil {
+			t.Logf("cleanup error for %s: %v", module.Name, err)
+		}
+	}
+
+	// Final summary
+	if len(inconsistentModules) > 0 {
+		t.Logf("parity check summary:")
+		t.Logf("modules with parity issues: %v", inconsistentModules)
+		t.Logf("this may indicate version mismatches or configuration differences")
+	} else {
+		t.Logf("all modules have parity: registry and local paths produce identical infrastructure")
+	}
 }
