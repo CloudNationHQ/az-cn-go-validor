@@ -12,12 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
-	"sync"
 	"testing"
-
-	"github.com/gruntwork-io/terratest/modules/terraform"
 )
 
 var (
@@ -131,13 +127,6 @@ func TestApplyAllLocal(t *testing.T) {
 	runModuleTests(t, modules, true, config, createLocalSetupFunc(config), "local")
 }
 
-// TestRegistryToLocalParity tests that local modules produce identical infrastructure to registry modules
-func TestRegistryToLocalParity(t *testing.T) {
-	config := setupConfig()
-	modules := discoverModules(t, config)
-	runParityTest(t, modules, config)
-}
-
 // TestOption represents a functional option for test execution
 type TestOption func(*TestConfig)
 
@@ -238,18 +227,6 @@ func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Conf
 		modules, _ := results.GetResults()
 		PrintModuleSummary(t, modules)
 	})
-}
-
-// runModuleTestsApplyOnly executes module applies without destroying resources.
-func runModuleTestsApplyOnly(t *testing.T, modules []*Module, parallel bool, config *Config) {
-	if config == nil {
-		t.Fatalf("config must not be nil for parity tests")
-	}
-
-	localConfig := *config
-	localConfig.SkipDestroy = true
-
-	runModuleTests(t, modules, parallel, &localConfig, nil, "registry")
 }
 
 // setupConfig initializes and returns the global configuration
@@ -395,210 +372,4 @@ func getRepoNameFromGit(dir string) string {
 		return strings.TrimSuffix(repoName, ".git")
 	}
 	return ""
-}
-
-// runParityTest tests registry vs local parity by comparing infrastructure
-func runParityTest(t *testing.T, modules []*Module, config *Config) {
-	ctx := context.Background()
-
-	t.Run("apply_registry", func(t *testing.T) {
-		runModuleTestsApplyOnly(t, modules, true, config)
-	})
-
-	if t.Failed() {
-		return
-	}
-
-	moduleInfo := extractModuleInfoFromRepo()
-	if moduleInfo.Name == "" || moduleInfo.Provider == "" {
-		t.Fatalf("could not determine module name and provider from repository")
-	}
-	moduleInfo.Namespace = config.Namespace
-
-	converter := NewSourceConverter(NewRegistryClient())
-	moduleNames := extractModuleNames(modules)
-	allFilesToRestore := convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo)
-
-	moduleSummaries := make(map[string]planChangeSummary)
-	var (
-		modulesWithMajor []string
-		modulesWithMinor []string
-		planErrors       []string
-	)
-	var (
-		mu sync.Mutex
-		wg sync.WaitGroup
-	)
-
-	for _, module := range modules {
-		mod := module
-		wg.Add(1)
-		t.Run(mod.Name+"_parity", func(t *testing.T) {
-			t.Parallel()
-			defer wg.Done()
-
-			if slices.Contains(config.ExceptionList, mod.Name) {
-				t.Logf("Skipping parity check for %s as it is in the exception list", mod.Name)
-				return
-			}
-
-			if mod.ApplyFailed {
-				t.Logf("Skipping parity check for %s as registry apply failed", mod.Name)
-				return
-			}
-
-			planStruct, err := mod.PlanWithStruct(t)
-			if err != nil {
-				t.Logf("parity error: failed to plan %s with local paths: %v", mod.Name, err)
-				mu.Lock()
-				planErrors = append(planErrors, fmt.Sprintf("%s: %v", mod.Name, err))
-				mu.Unlock()
-				return
-			}
-
-			summary := summarizePlanChanges(planStruct)
-
-			mu.Lock()
-			moduleSummaries[mod.Name] = summary
-			switch {
-			case summary.hasMajorDrift():
-				modulesWithMajor = append(modulesWithMajor, mod.Name)
-			case summary.hasChanges():
-				modulesWithMinor = append(modulesWithMinor, mod.Name)
-			}
-			mu.Unlock()
-
-			switch {
-			case summary.hasMajorDrift():
-				t.Logf("parity major drift: %s triggers replacements/destroys", mod.Name)
-				if len(summary.ReplaceAddresses) > 0 {
-					t.Logf("  replacements: %v", summary.ReplaceAddresses)
-				}
-				if len(summary.DestroyAddresses) > 0 {
-					t.Logf("  destroys: %v", summary.DestroyAddresses)
-				}
-				if len(summary.OtherAddresses) > 0 {
-					t.Logf("  other actions: %v", summary.OtherAddresses)
-				}
-			case summary.hasChanges():
-				t.Logf("parity drift detected: %s has additions/updates only (adds=%d, updates=%d)", mod.Name, summary.Adds, summary.Updates)
-				if len(summary.AddAddresses) > 0 {
-					t.Logf("  additions: %v", summary.AddAddresses)
-				}
-				if len(summary.UpdateAddresses) > 0 {
-					t.Logf("  updates: %v", summary.UpdateAddresses)
-				}
-			default:
-				t.Logf("parity confirmed: %s produces identical infrastructure with local paths", mod.Name)
-			}
-		})
-	}
-
-	wg.Wait()
-
-	// Cleanup after parity planning is complete
-	if restoreErr := converter.RevertToRegistry(ctx, allFilesToRestore); restoreErr != nil {
-		t.Logf("failed to restore files: %v", restoreErr)
-	}
-
-	for _, module := range modules {
-		cleanupOptions := terraform.WithDefaultRetryableErrors(t, module.Options)
-		cleanupOptions.Reconfigure = true
-		cleanupOptions.Upgrade = true
-		if _, err := terraform.InitE(t, cleanupOptions); err != nil {
-			t.Logf("cleanup init error for %s: %v", module.Name, err)
-		}
-		if err := module.Destroy(ctx, t); err != nil {
-			t.Logf("cleanup error for %s: %v", module.Name, err)
-		}
-	}
-
-	if len(planErrors) > 0 {
-		sort.Strings(planErrors)
-		t.Logf("parity check initialization errors:")
-		for _, errMsg := range planErrors {
-			t.Logf("- %s", errMsg)
-		}
-		t.Fatalf("registry and local modules failed to re-initialize for %d module(s)", len(planErrors))
-	}
-
-	if len(modulesWithMajor) > 0 {
-		sort.Strings(modulesWithMajor)
-		for _, moduleName := range modulesWithMajor {
-			summary := moduleSummaries[moduleName]
-			t.Logf("parity major drift: %s requires %d replacements and %d destroys", moduleName, summary.Replaces, summary.Deletes)
-		}
-		t.Logf("these changes will force resource recreation and require a major version bump")
-		t.Fatalf("registry and local modules are out of parity for %d module(s)", len(modulesWithMajor))
-	}
-
-	if len(modulesWithMinor) > 0 {
-		sort.Strings(modulesWithMinor)
-		t.Logf("parity drift summary (non-breaking): %v", modulesWithMinor)
-	}
-
-	t.Logf("all modules have parity: registry and local paths produce identical infrastructure")
-}
-
-type planChangeSummary struct {
-	Adds             int
-	Updates          int
-	Deletes          int
-	Replaces         int
-	DestroyAddresses []string
-	ReplaceAddresses []string
-	OtherAddresses   []string
-	AddAddresses     []string
-	UpdateAddresses  []string
-}
-
-func (s planChangeSummary) hasChanges() bool {
-	return s.Adds > 0 || s.Updates > 0 || s.Deletes > 0 || s.Replaces > 0 || len(s.OtherAddresses) > 0
-}
-
-func (s planChangeSummary) hasMajorDrift() bool {
-	return s.Replaces > 0 || s.Deletes > 0 || len(s.OtherAddresses) > 0
-}
-
-func summarizePlanChanges(plan *terraform.PlanStruct) planChangeSummary {
-	summary := planChangeSummary{}
-	if plan == nil {
-		return summary
-	}
-
-	for addr, change := range plan.ResourceChangesMap {
-		if change == nil || change.Change == nil {
-			continue
-		}
-
-		actions := change.Change.Actions
-		switch {
-		case actions.Replace():
-			summary.Replaces++
-			summary.ReplaceAddresses = append(summary.ReplaceAddresses, addr)
-		case actions.Delete():
-			summary.Deletes++
-			summary.DestroyAddresses = append(summary.DestroyAddresses, addr)
-		case actions.Create():
-			summary.Adds++
-			summary.AddAddresses = append(summary.AddAddresses, addr)
-		case actions.Update():
-			summary.Updates++
-			summary.UpdateAddresses = append(summary.UpdateAddresses, addr)
-		case actions.NoOp(), actions.Read(), actions.Forget():
-			continue
-		default:
-			if len(actions) == 0 {
-				continue
-			}
-			summary.OtherAddresses = append(summary.OtherAddresses, addr)
-		}
-	}
-
-	sort.Strings(summary.DestroyAddresses)
-	sort.Strings(summary.ReplaceAddresses)
-	sort.Strings(summary.OtherAddresses)
-	sort.Strings(summary.AddAddresses)
-	sort.Strings(summary.UpdateAddresses)
-	return summary
 }

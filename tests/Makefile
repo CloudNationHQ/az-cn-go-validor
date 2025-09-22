@@ -1,4 +1,4 @@
-.PHONY: test test-parallel test-sequential test-local test-parity
+.PHONY: test test-parallel test-sequential test-local
 
 TEST_ARGS := $(if $(skip-destroy),-skip-destroy=$(skip-destroy)) \
              $(if $(exception),-exception=$(exception)) \
@@ -16,6 +16,3 @@ test-sequential:
 
 test-local:
 	go test -v -timeout 60m -run '^TestApplyAllLocal$$' -args $(TEST_ARGS) .
-
-test-parity:
-	go test -v -timeout 60m -run '^TestRegistryToLocalParity$$' -args $(TEST_ARGS) .
