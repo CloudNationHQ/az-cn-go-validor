@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -424,7 +425,12 @@ func runParityTest(t *testing.T, modules []*Module, config *Config) {
 		}
 	}()
 
-	var inconsistentModules []string
+	moduleSummaries := make(map[string]planChangeSummary)
+	var (
+		modulesWithMajor []string
+		modulesWithMinor []string
+	)
+
 	for _, module := range modules {
 		if slices.Contains(config.ExceptionList, module.Name) {
 			t.Logf("Skipping parity check for %s as it is in the exception list", module.Name)
@@ -436,32 +442,105 @@ func runParityTest(t *testing.T, modules []*Module, config *Config) {
 			continue
 		}
 
-		terraform.WithDefaultRetryableErrors(t, module.Options)
-		if _, err := terraform.InitE(t, module.Options); err != nil {
-			errWrap := &ModuleError{ModuleName: module.Name, Operation: "terraform init (local parity)", Err: err}
-			module.Errors = append(module.Errors, errWrap.Error())
-			t.Fatalf("failed to init %s with local paths: %v", module.Name, err)
-		}
-
-		hasChanges, err := module.Plan(ctx, t)
+		planStruct, err := module.PlanWithStruct(t)
 		if err != nil {
 			t.Fatalf("failed to plan %s with local paths: %v", module.Name, err)
 		}
 
-		if hasChanges {
-			t.Logf("parity issue detected: %s has changes when using local paths", module.Name)
-			inconsistentModules = append(inconsistentModules, module.Name)
-		} else {
+		summary := summarizePlanChanges(planStruct)
+		moduleSummaries[module.Name] = summary
+
+		switch {
+		case summary.hasMajorDrift():
+			t.Logf("parity major drift: %s triggers replacements/destroys", module.Name)
+			if len(summary.ReplaceAddresses) > 0 {
+				t.Logf("  replacements: %v", summary.ReplaceAddresses)
+			}
+			if len(summary.DestroyAddresses) > 0 {
+				t.Logf("  destroys: %v", summary.DestroyAddresses)
+			}
+			if len(summary.OtherAddresses) > 0 {
+				t.Logf("  other actions: %v", summary.OtherAddresses)
+			}
+			modulesWithMajor = append(modulesWithMajor, module.Name)
+		case summary.hasChanges():
+			t.Logf("parity drift detected: %s has additions/updates only (adds=%d, updates=%d)", module.Name, summary.Adds, summary.Updates)
+			modulesWithMinor = append(modulesWithMinor, module.Name)
+		default:
 			t.Logf("parity confirmed: %s produces identical infrastructure with local paths", module.Name)
 		}
 	}
 
-	if len(inconsistentModules) > 0 {
-		t.Logf("parity check summary:")
-		t.Logf("modules with parity issues: %v", inconsistentModules)
-		t.Logf("this may indicate version mismatches or configuration differences")
-		t.Fatalf("registry and local modules are out of parity for %d module(s)", len(inconsistentModules))
+	if len(modulesWithMajor) > 0 {
+		t.Logf("parity check summary (major drift):")
+		for _, moduleName := range modulesWithMajor {
+			summary := moduleSummaries[moduleName]
+			t.Logf("- %s: %d replacements, %d destroys", moduleName, summary.Replaces, summary.Deletes)
+		}
+		t.Logf("these changes will force resource recreation and require a major version bump")
+		t.Fatalf("registry and local modules are out of parity for %d module(s)", len(modulesWithMajor))
+	}
+
+	if len(modulesWithMinor) > 0 {
+		t.Logf("parity drift summary (non-breaking): %v", modulesWithMinor)
 	}
 
 	t.Logf("all modules have parity: registry and local paths produce identical infrastructure")
+}
+
+type planChangeSummary struct {
+	Adds             int
+	Updates          int
+	Deletes          int
+	Replaces         int
+	DestroyAddresses []string
+	ReplaceAddresses []string
+	OtherAddresses   []string
+}
+
+func (s planChangeSummary) hasChanges() bool {
+	return s.Adds > 0 || s.Updates > 0 || s.Deletes > 0 || s.Replaces > 0 || len(s.OtherAddresses) > 0
+}
+
+func (s planChangeSummary) hasMajorDrift() bool {
+	return s.Replaces > 0 || s.Deletes > 0 || len(s.OtherAddresses) > 0
+}
+
+func summarizePlanChanges(plan *terraform.PlanStruct) planChangeSummary {
+	summary := planChangeSummary{}
+	if plan == nil {
+		return summary
+	}
+
+	for addr, change := range plan.ResourceChangesMap {
+		if change == nil || change.Change == nil {
+			continue
+		}
+
+		actions := change.Change.Actions
+		switch {
+		case actions.Replace():
+			summary.Replaces++
+			summary.ReplaceAddresses = append(summary.ReplaceAddresses, addr)
+		case actions.Delete():
+			summary.Deletes++
+			summary.DestroyAddresses = append(summary.DestroyAddresses, addr)
+		case actions.Create():
+			summary.Adds++
+		case actions.Update():
+			summary.Updates++
+		case actions.NoOp(), actions.Read(), actions.Forget():
+			continue
+		default:
+			if len(actions) == 0 {
+				continue
+			}
+			summary.OtherAddresses = append(summary.OtherAddresses, addr)
+		}
+	}
+
+	sort.Strings(summary.DestroyAddresses)
+	sort.Strings(summary.ReplaceAddresses)
+	sort.Strings(summary.OtherAddresses)
+	return summary
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
@@ -120,6 +121,43 @@ func (m *Module) Plan(ctx context.Context, t *testing.T) (bool, error) {
 	return hasChanges, nil
 }
 
+// PlanWithStruct runs terraform plan and returns the parsed plan structure for detailed inspection.
+func (m *Module) PlanWithStruct(t *testing.T) (*terraform.PlanStruct, error) {
+	t.Helper()
+
+	terraform.WithDefaultRetryableErrors(t, m.Options)
+
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("validor-plan-%s-", sanitizeFileComponent(m.Name)))
+	if err != nil {
+		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "create temp plan file", Err: err}
+		m.Errors = append(m.Errors, wrappedErr.Error())
+		return nil, wrappedErr
+	}
+	if err := tmpFile.Close(); err != nil {
+		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "close temp plan file", Err: err}
+		m.Errors = append(m.Errors, wrappedErr.Error())
+		return nil, wrappedErr
+	}
+	defer func() {
+		if removeErr := os.Remove(tmpFile.Name()); removeErr != nil {
+			t.Logf("Warning: failed to remove temp plan file %s: %v", tmpFile.Name(), removeErr)
+		}
+	}()
+
+	originalPlanPath := m.Options.PlanFilePath
+	m.Options.PlanFilePath = tmpFile.Name()
+	defer func() { m.Options.PlanFilePath = originalPlanPath }()
+
+	plan, err := terraform.InitAndPlanAndShowWithStructE(t, m.Options)
+	if err != nil {
+		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform plan", Err: err}
+		m.Errors = append(m.Errors, wrappedErr.Error())
+		return nil, wrappedErr
+	}
+
+	return plan, nil
+}
+
 // Destroy tears down a deployed Terraform module
 func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 	t.Helper()
@@ -197,4 +235,30 @@ func PrintModuleSummary(t *testing.T, modules []*Module) {
 	} else {
 		t.Logf("\n==== SUCCESS: All %d modules applied and destroyed successfully ====", len(modules))
 	}
+}
+
+func sanitizeFileComponent(name string) string {
+	sanitized := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '-' || r == '_':
+			return r
+		default:
+			return '-'
+		}
+	}, name)
+
+	sanitized = strings.Trim(sanitized, "-")
+	if sanitized == "" {
+		return "module"
+	}
+	if len(sanitized) > 48 {
+		sanitized = sanitized[:48]
+	}
+	return sanitized
 }
