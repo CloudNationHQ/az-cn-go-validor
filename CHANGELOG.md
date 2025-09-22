@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.4](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.3...v1.12.4) (2025-09-22)
+
+
+### Bug Fixes
+
+* fix early destroy on wrong path ([#57](https://github.com/CloudNationHQ/az-cn-go-validor/issues/57)) ([ca970e5](https://github.com/CloudNationHQ/az-cn-go-validor/commit/ca970e587ad697f886f6722c870f0c6b0eec2c68))
+
 ## [1.12.3](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.2...v1.12.3) (2025-09-22)
 
 
