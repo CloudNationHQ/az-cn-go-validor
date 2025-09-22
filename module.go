@@ -132,7 +132,7 @@ func (m *Module) PlanWithStruct(t *testing.T) (*terraform.PlanStruct, error) {
 		return nil, wrappedErr
 	}
 
-	terraform.WithDefaultRetryableErrors(t, planOptions)
+	planOptions = terraform.WithDefaultRetryableErrors(t, planOptions)
 
 	tmpFile, err := os.CreateTemp("", fmt.Sprintf("validor-plan-%s-", sanitizeFileComponent(m.Name)))
 	if err != nil {
@@ -154,6 +154,8 @@ func (m *Module) PlanWithStruct(t *testing.T) (*terraform.PlanStruct, error) {
 	planOptions.PlanFilePath = tmpFile.Name()
 	planOptions.Reconfigure = true
 	planOptions.Upgrade = true
+
+	t.Logf("Parity plan (local sources): module=%s dir=%s", m.Name, planOptions.TerraformDir)
 
 	plan, err := terraform.InitAndPlanAndShowWithStructE(t, planOptions)
 	if err != nil {
