@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.2](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.1...v1.12.2) (2025-09-22)
+
+
+### Bug Fixes
+
+* fix faulty order parity testing ([#52](https://github.com/CloudNationHQ/az-cn-go-validor/issues/52)) ([14851b3](https://github.com/CloudNationHQ/az-cn-go-validor/commit/14851b39cd0f888c5d461cf267528b6382d04105))
+* fix logic abit ([#54](https://github.com/CloudNationHQ/az-cn-go-validor/issues/54)) ([a48b219](https://github.com/CloudNationHQ/az-cn-go-validor/commit/a48b219afe15828117fd77c8319a8560661a4d18))
+
 ## [1.12.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.0...v1.12.1) (2025-09-22)
 
 
