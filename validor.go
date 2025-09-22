@@ -419,35 +419,23 @@ func runParityTest(t *testing.T, modules []*Module, config *Config) {
 	moduleNames := extractModuleNames(modules)
 	allFilesToRestore := convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo)
 
-	defer func() {
-		// Always restore files and destroy
-		if restoreErr := converter.RevertToRegistry(ctx, allFilesToRestore); restoreErr != nil {
-			t.Logf("failed to restore files: %v", restoreErr)
-		}
-		// Destroy all modules
-		for _, module := range modules {
-			terraform.WithDefaultRetryableErrors(t, module.Options)
-			if _, err := terraform.InitE(t, module.Options); err != nil {
-				t.Logf("cleanup init error for %s: %v", module.Name, err)
-			}
-			if err := module.Destroy(ctx, t); err != nil {
-				t.Logf("cleanup error for %s: %v", module.Name, err)
-			}
-		}
-	}()
-
 	moduleSummaries := make(map[string]planChangeSummary)
 	var (
 		modulesWithMajor []string
 		modulesWithMinor []string
 		planErrors       []string
 	)
-	var mu sync.Mutex
+	var (
+		mu sync.Mutex
+		wg sync.WaitGroup
+	)
 
 	for _, module := range modules {
 		mod := module
+		wg.Add(1)
 		t.Run(mod.Name+"_parity", func(t *testing.T) {
 			t.Parallel()
+			defer wg.Done()
 
 			if slices.Contains(config.ExceptionList, mod.Name) {
 				t.Logf("Skipping parity check for %s as it is in the exception list", mod.Name)
@@ -504,6 +492,25 @@ func runParityTest(t *testing.T, modules []*Module, config *Config) {
 				t.Logf("parity confirmed: %s produces identical infrastructure with local paths", mod.Name)
 			}
 		})
+	}
+
+	wg.Wait()
+
+	// Cleanup after parity planning is complete
+	if restoreErr := converter.RevertToRegistry(ctx, allFilesToRestore); restoreErr != nil {
+		t.Logf("failed to restore files: %v", restoreErr)
+	}
+
+	for _, module := range modules {
+		cleanupOptions := terraform.WithDefaultRetryableErrors(t, module.Options)
+		cleanupOptions.Reconfigure = true
+		cleanupOptions.Upgrade = true
+		if _, err := terraform.InitE(t, cleanupOptions); err != nil {
+			t.Logf("cleanup init error for %s: %v", module.Name, err)
+		}
+		if err := module.Destroy(ctx, t); err != nil {
+			t.Logf("cleanup error for %s: %v", module.Name, err)
+		}
 	}
 
 	if len(planErrors) > 0 {
