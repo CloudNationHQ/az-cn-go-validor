@@ -494,6 +494,12 @@ func runParityTest(t *testing.T, modules []*Module, config *Config) {
 				}
 			case summary.hasChanges():
 				t.Logf("parity drift detected: %s has additions/updates only (adds=%d, updates=%d)", mod.Name, summary.Adds, summary.Updates)
+				if len(summary.AddAddresses) > 0 {
+					t.Logf("  additions: %v", summary.AddAddresses)
+				}
+				if len(summary.UpdateAddresses) > 0 {
+					t.Logf("  updates: %v", summary.UpdateAddresses)
+				}
 			default:
 				t.Logf("parity confirmed: %s produces identical infrastructure with local paths", mod.Name)
 			}
@@ -535,6 +541,8 @@ type planChangeSummary struct {
 	DestroyAddresses []string
 	ReplaceAddresses []string
 	OtherAddresses   []string
+	AddAddresses     []string
+	UpdateAddresses  []string
 }
 
 func (s planChangeSummary) hasChanges() bool {
@@ -566,8 +574,10 @@ func summarizePlanChanges(plan *terraform.PlanStruct) planChangeSummary {
 			summary.DestroyAddresses = append(summary.DestroyAddresses, addr)
 		case actions.Create():
 			summary.Adds++
+			summary.AddAddresses = append(summary.AddAddresses, addr)
 		case actions.Update():
 			summary.Updates++
+			summary.UpdateAddresses = append(summary.UpdateAddresses, addr)
 		case actions.NoOp(), actions.Read(), actions.Forget():
 			continue
 		default:
@@ -581,5 +591,7 @@ func summarizePlanChanges(plan *terraform.PlanStruct) planChangeSummary {
 	sort.Strings(summary.DestroyAddresses)
 	sort.Strings(summary.ReplaceAddresses)
 	sort.Strings(summary.OtherAddresses)
+	sort.Strings(summary.AddAddresses)
+	sort.Strings(summary.UpdateAddresses)
 	return summary
 }

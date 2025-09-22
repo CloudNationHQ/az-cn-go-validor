@@ -125,7 +125,14 @@ func (m *Module) Plan(ctx context.Context, t *testing.T) (bool, error) {
 func (m *Module) PlanWithStruct(t *testing.T) (*terraform.PlanStruct, error) {
 	t.Helper()
 
-	terraform.WithDefaultRetryableErrors(t, m.Options)
+	planOptions, err := m.Options.Clone()
+	if err != nil {
+		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "clone terraform options", Err: err}
+		m.Errors = append(m.Errors, wrappedErr.Error())
+		return nil, wrappedErr
+	}
+
+	terraform.WithDefaultRetryableErrors(t, planOptions)
 
 	tmpFile, err := os.CreateTemp("", fmt.Sprintf("validor-plan-%s-", sanitizeFileComponent(m.Name)))
 	if err != nil {
@@ -144,11 +151,11 @@ func (m *Module) PlanWithStruct(t *testing.T) (*terraform.PlanStruct, error) {
 		}
 	}()
 
-	originalPlanPath := m.Options.PlanFilePath
-	m.Options.PlanFilePath = tmpFile.Name()
-	defer func() { m.Options.PlanFilePath = originalPlanPath }()
+	planOptions.PlanFilePath = tmpFile.Name()
+	planOptions.Reconfigure = true
+	planOptions.Upgrade = true
 
-	plan, err := terraform.InitAndPlanAndShowWithStructE(t, m.Options)
+	plan, err := terraform.InitAndPlanAndShowWithStructE(t, planOptions)
 	if err != nil {
 		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform plan", Err: err}
 		m.Errors = append(m.Errors, wrappedErr.Error())
