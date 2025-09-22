@@ -381,38 +381,35 @@ func getRepoNameFromGit(dir string) string {
 	return ""
 }
 
-// runParityTest tests registry vs local parity
-func runParityTest(t *testing.T, modules []*Module, _ *Config) {
+// runParityTest tests registry vs local parity using parallel execution
+func runParityTest(t *testing.T, modules []*Module, config *Config) {
 	ctx := context.Background()
+
+	runModuleTests(t, modules, true, config, nil, "registry")
+
+	moduleInfo := extractModuleInfoFromRepo()
+	if moduleInfo.Name == "" || moduleInfo.Provider == "" {
+		t.Fatalf("could not determine module name and provider from repository")
+	}
+	moduleInfo.Namespace = config.Namespace
+
+	converter := NewSourceConverter(NewRegistryClient())
+	moduleNames := extractModuleNames(modules)
+	allFilesToRestore := convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo)
+
+	defer func() {
+		// Always restore files
+		if restoreErr := converter.RevertToRegistry(ctx, allFilesToRestore); restoreErr != nil {
+			t.Logf("failed to restore files: %v", restoreErr)
+		}
+	}()
+
 	var inconsistentModules []string
-
 	for _, module := range modules {
-		t.Run(module.Name, func(t *testing.T) {
-			defer func() {
-				if err := module.Destroy(ctx, t); err != nil {
-					t.Logf("cleanup error for %s: %v", module.Name, err)
-				}
-			}()
-
-			if err := module.Apply(ctx, t); err != nil {
-				t.Fatalf("failed to apply %s from registry: %v", module.Name, err)
-			}
-
-			converter := NewSourceConverter(NewRegistryClient())
-			moduleInfo := extractModuleInfoFromRepo()
-
-			filesToRestore, err := converter.ConvertToLocal(ctx, module.Path, moduleInfo)
-			if err != nil {
-				t.Fatalf("failed to convert %s to local: %v", module.Name, err)
-			}
-
+		t.Run(module.Name+"_parity", func(t *testing.T) {
 			hasChanges, err := module.Plan(ctx, t)
 			if err != nil {
 				t.Fatalf("failed to plan %s with local paths: %v", module.Name, err)
-			}
-
-			if restoreErr := converter.RevertToRegistry(ctx, filesToRestore); restoreErr != nil {
-				t.Logf("failed to restore files for %s: %v", module.Name, restoreErr)
 			}
 
 			if hasChanges {
@@ -422,6 +419,12 @@ func runParityTest(t *testing.T, modules []*Module, _ *Config) {
 				t.Logf("parity confirmed: %s produces identical infrastructure with local paths", module.Name)
 			}
 		})
+	}
+
+	for _, module := range modules {
+		if err := module.Destroy(ctx, t); err != nil {
+			t.Logf("cleanup error for %s: %v", module.Name, err)
+		}
 	}
 
 	// Final summary
