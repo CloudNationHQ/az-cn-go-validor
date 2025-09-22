@@ -400,7 +400,13 @@ func getRepoNameFromGit(dir string) string {
 func runParityTest(t *testing.T, modules []*Module, config *Config) {
 	ctx := context.Background()
 
-	runModuleTestsApplyOnly(t, modules, true, config)
+	t.Run("apply_registry", func(t *testing.T) {
+		runModuleTestsApplyOnly(t, modules, true, config)
+	})
+
+	if t.Failed() {
+		return
+	}
 
 	moduleInfo := extractModuleInfoFromRepo()
 	if moduleInfo.Name == "" || moduleInfo.Provider == "" {
