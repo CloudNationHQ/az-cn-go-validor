@@ -95,6 +95,31 @@ func (m *Module) Apply(ctx context.Context, t *testing.T) error {
 	return nil
 }
 
+// Plan generates and returns a Terraform execution plan
+func (m *Module) Plan(ctx context.Context, t *testing.T) (bool, error) {
+	t.Helper()
+
+	t.Logf("Planning Terraform module: %s", m.Name)
+	terraform.WithDefaultRetryableErrors(t, m.Options)
+
+	exitCode, err := terraform.PlanExitCodeE(t, m.Options)
+	if err != nil {
+		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform plan", Err: err}
+		m.Errors = append(m.Errors, wrappedErr.Error())
+		t.Log(redError(wrappedErr.Error()))
+		return false, wrappedErr
+	}
+
+	hasChanges := exitCode == 2
+	if hasChanges {
+		t.Logf("Changes detected in module: %s", m.Name)
+	} else {
+		t.Logf("No changes detected in module: %s", m.Name)
+	}
+
+	return hasChanges, nil
+}
+
 // Destroy tears down a deployed Terraform module
 func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 	t.Helper()
