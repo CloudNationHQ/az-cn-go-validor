@@ -14,6 +14,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/gruntwork-io/terratest/modules/terraform"
 )
 
 var (
@@ -236,6 +238,18 @@ func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Conf
 	})
 }
 
+// runModuleTestsApplyOnly executes module applies without destroying resources.
+func runModuleTestsApplyOnly(t *testing.T, modules []*Module, parallel bool, config *Config) {
+	if config == nil {
+		t.Fatalf("config must not be nil for parity tests")
+	}
+
+	localConfig := *config
+	localConfig.SkipDestroy = true
+
+	runModuleTests(t, modules, parallel, &localConfig, nil, "registry")
+}
+
 // setupConfig initializes and returns the global configuration
 func setupConfig() *Config {
 	config := GetConfig()
@@ -381,11 +395,11 @@ func getRepoNameFromGit(dir string) string {
 	return ""
 }
 
-// runParityTest tests registry vs local parity using parallel execution
+// runParityTest tests registry vs local parity by comparing infrastructure
 func runParityTest(t *testing.T, modules []*Module, config *Config) {
 	ctx := context.Background()
 
-	runModuleTests(t, modules, true, config, nil, "registry")
+	runModuleTestsApplyOnly(t, modules, true, config)
 
 	moduleInfo := extractModuleInfoFromRepo()
 	if moduleInfo.Name == "" || moduleInfo.Provider == "" {
@@ -398,41 +412,56 @@ func runParityTest(t *testing.T, modules []*Module, config *Config) {
 	allFilesToRestore := convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo)
 
 	defer func() {
-		// Always restore files
+		// Always restore files and destroy
 		if restoreErr := converter.RevertToRegistry(ctx, allFilesToRestore); restoreErr != nil {
 			t.Logf("failed to restore files: %v", restoreErr)
+		}
+		// Destroy all modules
+		for _, module := range modules {
+			if err := module.Destroy(ctx, t); err != nil {
+				t.Logf("cleanup error for %s: %v", module.Name, err)
+			}
 		}
 	}()
 
 	var inconsistentModules []string
 	for _, module := range modules {
-		t.Run(module.Name+"_parity", func(t *testing.T) {
-			hasChanges, err := module.Plan(ctx, t)
-			if err != nil {
-				t.Fatalf("failed to plan %s with local paths: %v", module.Name, err)
-			}
+		if slices.Contains(config.ExceptionList, module.Name) {
+			t.Logf("Skipping parity check for %s as it is in the exception list", module.Name)
+			continue
+		}
 
-			if hasChanges {
-				t.Logf("parity issue detected: %s has changes when using local paths", module.Name)
-				inconsistentModules = append(inconsistentModules, module.Name)
-			} else {
-				t.Logf("parity confirmed: %s produces identical infrastructure with local paths", module.Name)
-			}
-		})
-	}
+		if module.ApplyFailed {
+			t.Logf("Skipping parity check for %s as registry apply failed", module.Name)
+			continue
+		}
 
-	for _, module := range modules {
-		if err := module.Destroy(ctx, t); err != nil {
-			t.Logf("cleanup error for %s: %v", module.Name, err)
+		terraform.WithDefaultRetryableErrors(t, module.Options)
+		if _, err := terraform.InitE(t, module.Options); err != nil {
+			errWrap := &ModuleError{ModuleName: module.Name, Operation: "terraform init (local parity)", Err: err}
+			module.Errors = append(module.Errors, errWrap.Error())
+			t.Fatalf("failed to init %s with local paths: %v", module.Name, err)
+		}
+
+		hasChanges, err := module.Plan(ctx, t)
+		if err != nil {
+			t.Fatalf("failed to plan %s with local paths: %v", module.Name, err)
+		}
+
+		if hasChanges {
+			t.Logf("parity issue detected: %s has changes when using local paths", module.Name)
+			inconsistentModules = append(inconsistentModules, module.Name)
+		} else {
+			t.Logf("parity confirmed: %s produces identical infrastructure with local paths", module.Name)
 		}
 	}
 
-	// Final summary
 	if len(inconsistentModules) > 0 {
 		t.Logf("parity check summary:")
 		t.Logf("modules with parity issues: %v", inconsistentModules)
 		t.Logf("this may indicate version mismatches or configuration differences")
-	} else {
-		t.Logf("all modules have parity: registry and local paths produce identical infrastructure")
+		t.Fatalf("registry and local modules are out of parity for %d module(s)", len(inconsistentModules))
 	}
+
+	t.Logf("all modules have parity: registry and local paths produce identical infrastructure")
 }
