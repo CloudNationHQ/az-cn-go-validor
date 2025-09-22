@@ -1,55 +1,5 @@
 # Changelog
 
-## [1.12.6](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.5...v1.12.6) (2025-09-22)
-
-
-### Bug Fixes
-
-* fix drift detections ([#61](https://github.com/CloudNationHQ/az-cn-go-validor/issues/61)) ([b3ac829](https://github.com/CloudNationHQ/az-cn-go-validor/commit/b3ac8293d8ea6f943c9727a63c9acba17aaaef0e))
-
-## [1.12.5](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.4...v1.12.5) (2025-09-22)
-
-
-### Bug Fixes
-
-* small refactor ([#59](https://github.com/CloudNationHQ/az-cn-go-validor/issues/59)) ([2392a78](https://github.com/CloudNationHQ/az-cn-go-validor/commit/2392a78a919fa5132536a62b5766bf4c1a6715db))
-
-## [1.12.4](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.3...v1.12.4) (2025-09-22)
-
-
-### Bug Fixes
-
-* fix early destroy on wrong path ([#57](https://github.com/CloudNationHQ/az-cn-go-validor/issues/57)) ([ca970e5](https://github.com/CloudNationHQ/az-cn-go-validor/commit/ca970e587ad697f886f6722c870f0c6b0eec2c68))
-
-## [1.12.3](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.2...v1.12.3) (2025-09-22)
-
-
-### Bug Fixes
-
-* fix order of execution again ([#55](https://github.com/CloudNationHQ/az-cn-go-validor/issues/55)) ([f6c764c](https://github.com/CloudNationHQ/az-cn-go-validor/commit/f6c764c796e2eafe9fc56e7d3e9920cb048edd7c))
-
-## [1.12.2](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.1...v1.12.2) (2025-09-22)
-
-
-### Bug Fixes
-
-* fix faulty order parity testing ([#52](https://github.com/CloudNationHQ/az-cn-go-validor/issues/52)) ([14851b3](https://github.com/CloudNationHQ/az-cn-go-validor/commit/14851b39cd0f888c5d461cf267528b6382d04105))
-* fix logic abit ([#54](https://github.com/CloudNationHQ/az-cn-go-validor/issues/54)) ([a48b219](https://github.com/CloudNationHQ/az-cn-go-validor/commit/a48b219afe15828117fd77c8319a8560661a4d18))
-
-## [1.12.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.0...v1.12.1) (2025-09-22)
-
-
-### Bug Fixes
-
-* fix parallel processing ([#50](https://github.com/CloudNationHQ/az-cn-go-validor/issues/50)) ([3a9a79b](https://github.com/CloudNationHQ/az-cn-go-validor/commit/3a9a79b2c4274f90286c9ea4a0439b741c7bcc93))
-
-## [1.12.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.11.0...v1.12.0) (2025-09-22)
-
-
-### Features
-
-* implement parity testing between registry and local module sources ([#48](https://github.com/CloudNationHQ/az-cn-go-validor/issues/48)) ([4db1184](https://github.com/CloudNationHQ/az-cn-go-validor/commit/4db118496affbe26f543fc3a3d61317f5aaf9fc6))
-
 ## [1.11.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.10.1...v1.11.0) (2025-09-16)
 
 

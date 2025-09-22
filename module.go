@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
@@ -96,77 +95,6 @@ func (m *Module) Apply(ctx context.Context, t *testing.T) error {
 	return nil
 }
 
-// Plan generates and returns a Terraform execution plan
-func (m *Module) Plan(ctx context.Context, t *testing.T) (bool, error) {
-	t.Helper()
-
-	t.Logf("Planning Terraform module: %s", m.Name)
-	terraform.WithDefaultRetryableErrors(t, m.Options)
-
-	exitCode, err := terraform.PlanExitCodeE(t, m.Options)
-	if err != nil {
-		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform plan", Err: err}
-		m.Errors = append(m.Errors, wrappedErr.Error())
-		t.Log(redError(wrappedErr.Error()))
-		return false, wrappedErr
-	}
-
-	hasChanges := exitCode == 2
-	if hasChanges {
-		t.Logf("Changes detected in module: %s", m.Name)
-	} else {
-		t.Logf("No changes detected in module: %s", m.Name)
-	}
-
-	return hasChanges, nil
-}
-
-// PlanWithStruct runs terraform plan and returns the parsed plan structure for detailed inspection.
-func (m *Module) PlanWithStruct(t *testing.T) (*terraform.PlanStruct, error) {
-	t.Helper()
-
-	planOptions, err := m.Options.Clone()
-	if err != nil {
-		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "clone terraform options", Err: err}
-		m.Errors = append(m.Errors, wrappedErr.Error())
-		return nil, wrappedErr
-	}
-
-	planOptions = terraform.WithDefaultRetryableErrors(t, planOptions)
-
-	tmpFile, err := os.CreateTemp("", fmt.Sprintf("validor-plan-%s-", sanitizeFileComponent(m.Name)))
-	if err != nil {
-		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "create temp plan file", Err: err}
-		m.Errors = append(m.Errors, wrappedErr.Error())
-		return nil, wrappedErr
-	}
-	if err := tmpFile.Close(); err != nil {
-		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "close temp plan file", Err: err}
-		m.Errors = append(m.Errors, wrappedErr.Error())
-		return nil, wrappedErr
-	}
-	defer func() {
-		if removeErr := os.Remove(tmpFile.Name()); removeErr != nil {
-			t.Logf("Warning: failed to remove temp plan file %s: %v", tmpFile.Name(), removeErr)
-		}
-	}()
-
-	planOptions.PlanFilePath = tmpFile.Name()
-	planOptions.Reconfigure = true
-	planOptions.Upgrade = true
-
-	t.Logf("Parity plan (local sources): module=%s dir=%s", m.Name, planOptions.TerraformDir)
-
-	plan, err := terraform.InitAndPlanAndShowWithStructE(t, planOptions)
-	if err != nil {
-		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform plan", Err: err}
-		m.Errors = append(m.Errors, wrappedErr.Error())
-		return nil, wrappedErr
-	}
-
-	return plan, nil
-}
-
 // Destroy tears down a deployed Terraform module
 func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 	t.Helper()
@@ -244,30 +172,4 @@ func PrintModuleSummary(t *testing.T, modules []*Module) {
 	} else {
 		t.Logf("\n==== SUCCESS: All %d modules applied and destroyed successfully ====", len(modules))
 	}
-}
-
-func sanitizeFileComponent(name string) string {
-	sanitized := strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z':
-			return r
-		case r >= 'A' && r <= 'Z':
-			return r
-		case r >= '0' && r <= '9':
-			return r
-		case r == '-' || r == '_':
-			return r
-		default:
-			return '-'
-		}
-	}, name)
-
-	sanitized = strings.Trim(sanitized, "-")
-	if sanitized == "" {
-		return "module"
-	}
-	if len(sanitized) > 48 {
-		sanitized = sanitized[:48]
-	}
-	return sanitized
 }
