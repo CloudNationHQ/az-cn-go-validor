@@ -127,6 +127,13 @@ func TestApplyAllLocal(t *testing.T) {
 	runModuleTests(t, modules, true, config, createLocalSetupFunc(config), "local")
 }
 
+// TestRegistryToLocalParity tests that local modules produce identical infrastructure to registry modules
+func TestRegistryToLocalParity(t *testing.T) {
+	config := setupConfig()
+	modules := discoverModules(t, config)
+	runParityTest(t, modules, config)
+}
+
 // TestOption represents a functional option for test execution
 type TestOption func(*TestConfig)
 
@@ -372,4 +379,57 @@ func getRepoNameFromGit(dir string) string {
 		return strings.TrimSuffix(repoName, ".git")
 	}
 	return ""
+}
+
+// runParityTest tests registry vs local parity
+func runParityTest(t *testing.T, modules []*Module, _ *Config) {
+	ctx := context.Background()
+	var inconsistentModules []string
+
+	for _, module := range modules {
+		t.Run(module.Name, func(t *testing.T) {
+			defer func() {
+				if err := module.Destroy(ctx, t); err != nil {
+					t.Logf("cleanup error for %s: %v", module.Name, err)
+				}
+			}()
+
+			if err := module.Apply(ctx, t); err != nil {
+				t.Fatalf("failed to apply %s from registry: %v", module.Name, err)
+			}
+
+			converter := NewSourceConverter(NewRegistryClient())
+			moduleInfo := extractModuleInfoFromRepo()
+
+			filesToRestore, err := converter.ConvertToLocal(ctx, module.Path, moduleInfo)
+			if err != nil {
+				t.Fatalf("failed to convert %s to local: %v", module.Name, err)
+			}
+
+			hasChanges, err := module.Plan(ctx, t)
+			if err != nil {
+				t.Fatalf("failed to plan %s with local paths: %v", module.Name, err)
+			}
+
+			if restoreErr := converter.RevertToRegistry(ctx, filesToRestore); restoreErr != nil {
+				t.Logf("failed to restore files for %s: %v", module.Name, restoreErr)
+			}
+
+			if hasChanges {
+				t.Logf("parity issue detected: %s has changes when using local paths", module.Name)
+				inconsistentModules = append(inconsistentModules, module.Name)
+			} else {
+				t.Logf("parity confirmed: %s produces identical infrastructure with local paths", module.Name)
+			}
+		})
+	}
+
+	// Final summary
+	if len(inconsistentModules) > 0 {
+		t.Logf("parity check summary:")
+		t.Logf("modules with parity issues: %v", inconsistentModules)
+		t.Logf("this may indicate version mismatches or configuration differences")
+	} else {
+		t.Logf("all modules have parity: registry and local paths produce identical infrastructure")
+	}
 }
