@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.3](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.2...v1.12.3) (2025-09-22)
+
+
+### Bug Fixes
+
+* fix order of execution again ([#55](https://github.com/CloudNationHQ/az-cn-go-validor/issues/55)) ([f6c764c](https://github.com/CloudNationHQ/az-cn-go-validor/commit/f6c764c796e2eafe9fc56e7d3e9920cb048edd7c))
+
 ## [1.12.2](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.1...v1.12.2) (2025-09-22)
 
 
