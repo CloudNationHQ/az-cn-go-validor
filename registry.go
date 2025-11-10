@@ -9,13 +9,11 @@ import (
 	"time"
 )
 
-// DefaultRegistryClient implements RegistryClient for Terraform Registry
 type DefaultRegistryClient struct {
 	baseURL string
 	client  *http.Client
 }
 
-// NewRegistryClient creates a new registry client
 func NewRegistryClient() RegistryClient {
 	return &DefaultRegistryClient{
 		baseURL: "https://registry.terraform.io/v1/modules",
@@ -23,7 +21,6 @@ func NewRegistryClient() RegistryClient {
 	}
 }
 
-// GetLatestVersion fetches the latest version from Terraform Registry
 func (c *DefaultRegistryClient) GetLatestVersion(ctx context.Context, namespace, name, provider string) (string, error) {
 	url := fmt.Sprintf("%s/%s/%s/%s/versions", c.baseURL, namespace, name, provider)
 
@@ -58,3 +55,4 @@ func (c *DefaultRegistryClient) GetLatestVersion(ctx context.Context, namespace,
 
 	return registryResp.Versions[0].Version, nil
 }
+

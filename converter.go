@@ -14,19 +14,16 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-// DefaultSourceConverter implements SourceConverter
 type DefaultSourceConverter struct {
 	registryClient RegistryClient
 }
 
-// NewSourceConverter creates a new source converter
 func NewSourceConverter(client RegistryClient) SourceConverter {
 	return &DefaultSourceConverter{
 		registryClient: client,
 	}
 }
 
-// ConvertToLocal converts module blocks in Terraform files to use local source
 func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath string, moduleInfo ModuleInfo) ([]FileRestore, error) {
 	var filesToRestore []FileRestore
 
@@ -78,7 +75,6 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 	return filesToRestore, nil
 }
 
-// RevertToRegistry reverts files back to registry source with latest version
 func (c *DefaultSourceConverter) RevertToRegistry(ctx context.Context, filesToRestore []FileRestore) error {
 	for _, restore := range filesToRestore {
 		select {
@@ -87,17 +83,14 @@ func (c *DefaultSourceConverter) RevertToRegistry(ctx context.Context, filesToRe
 		default:
 		}
 
-		// Get latest version from registry
 		latestVersion, err := c.registryClient.GetLatestVersion(ctx, restore.Namespace, restore.ModuleName, restore.Provider)
 		if err != nil {
-			// If we can't get the latest version, fall back to original content
 			if writeErr := os.WriteFile(restore.Path, []byte(restore.OriginalContent), 0644); writeErr != nil {
 				return fmt.Errorf("failed to restore file %s: %w", restore.Path, writeErr)
 			}
 			continue
 		}
 
-		// Create updated content with latest version
 		updatedContent := c.updateVersionInContent(restore.OriginalContent, latestVersion)
 
 		if err := os.WriteFile(restore.Path, []byte(updatedContent), 0644); err != nil {
@@ -107,7 +100,6 @@ func (c *DefaultSourceConverter) RevertToRegistry(ctx context.Context, filesToRe
 	return nil
 }
 
-// updateVersionInContent updates the version in the content if it exists
 func (c *DefaultSourceConverter) updateVersionInContent(content, latestVersion string) string {
 	versionRegex := regexp.MustCompile(`(version\s*=\s*")[^"]*(")`)
 	if versionRegex.MatchString(content) {
