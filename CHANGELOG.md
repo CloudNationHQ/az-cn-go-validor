@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.13.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.7...v1.13.0) (2025-11-10)
+
+
+### Features
+
+* add configurable examples path with optional pattern support ([#70](https://github.com/CloudNationHQ/az-cn-go-validor/issues/70)) ([2788db3](https://github.com/CloudNationHQ/az-cn-go-validor/commit/2788db304598ed6f98c295559ce13978b2e28bd1))
+* **deps:** bump github.com/ulikunitz/xz from 0.5.10 to 0.5.14 ([#15](https://github.com/CloudNationHQ/az-cn-go-validor/issues/15)) ([47c39e6](https://github.com/CloudNationHQ/az-cn-go-validor/commit/47c39e607172c0527d428457eb7f7ac16017c452))
+
 ## [1.12.7](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.6...v1.12.7) (2025-09-22)
 
 
