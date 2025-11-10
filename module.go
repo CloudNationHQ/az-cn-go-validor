@@ -11,7 +11,6 @@ import (
 	"github.com/gruntwork-io/terratest/modules/terraform"
 )
 
-// Module represents a Terraform module to test
 type Module struct {
 	Name        string
 	Path        string
@@ -20,25 +19,21 @@ type Module struct {
 	ApplyFailed bool
 }
 
-// ModuleManager manages Terraform module discovery
 type ModuleManager struct {
 	BaseExamplesPath string
 	Config           *Config
 }
 
-// NewModuleManager creates a new ModuleManager
 func NewModuleManager(baseExamplesPath string) *ModuleManager {
 	return &ModuleManager{
 		BaseExamplesPath: baseExamplesPath,
 	}
 }
 
-// SetConfig sets the configuration for the module manager
 func (mm *ModuleManager) SetConfig(config *Config) {
 	mm.Config = config
 }
 
-// NewModule creates a new Module instance
 func NewModule(name, path string) *Module {
 	return &Module{
 		Name: name,
@@ -53,7 +48,6 @@ func NewModule(name, path string) *Module {
 	}
 }
 
-// DiscoverModules finds all Terraform modules in the examples directory
 func (mm *ModuleManager) DiscoverModules() ([]*Module, error) {
 	var modules []*Module
 
@@ -77,7 +71,6 @@ func (mm *ModuleManager) DiscoverModules() ([]*Module, error) {
 	return modules, nil
 }
 
-// Apply deploys a Terraform module
 func (m *Module) Apply(ctx context.Context, t *testing.T) error {
 	t.Helper()
 
@@ -95,7 +88,6 @@ func (m *Module) Apply(ctx context.Context, t *testing.T) error {
 	return nil
 }
 
-// Destroy tears down a deployed Terraform module
 func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 	t.Helper()
 
@@ -118,7 +110,6 @@ func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 	return destroyErr
 }
 
-// Cleanup removes Terraform-generated files after testing
 func (m *Module) Cleanup(ctx context.Context, t *testing.T) error {
 	t.Helper()
 	t.Logf("Cleaning up in: %s", m.Options.TerraformDir)
@@ -144,7 +135,6 @@ func (m *Module) Cleanup(ctx context.Context, t *testing.T) error {
 	return nil
 }
 
-// PrintModuleSummary prints a formatted summary of module test results
 func PrintModuleSummary(t *testing.T, modules []*Module) {
 	t.Helper()
 
@@ -156,17 +146,15 @@ func PrintModuleSummary(t *testing.T, modules []*Module) {
 	}
 
 	if len(failedModules) > 0 {
-		// Print details for each failed module
 		for _, module := range failedModules {
 			t.Log(redError("Module " + module.Name + " failed with errors:"))
 			for i, errMsg := range module.Errors {
 				errText := fmt.Sprintf("  %d. %s", i+1, errMsg)
 				t.Log(redError(errText))
 			}
-			t.Log("") // Empty line for better readability
+			t.Log("")
 		}
 
-		// Print a count summary at the end
 		totalText := fmt.Sprintf("TOTAL: %d of %d modules failed", len(failedModules), len(modules))
 		t.Log(redError(totalText))
 	} else {

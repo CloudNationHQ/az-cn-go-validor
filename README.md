@@ -46,13 +46,17 @@ Provides detailed error reporting with actionable feedback.
 
 `Flexible Configuration`
 
-Command-line flags for runtime configuration (`-example`, `-exception`, `-local`, `-namespace`).
+Command-line flags for runtime configuration (`-example`, `-exception`, `-local`, `-namespace`, `-examples-path`).
+
+Optional pattern support for programmatic configuration (e.g., `WithExamplesPath`, `WithExample`).
 
 Environment variable support for CI/CD integration.
 
 Exception lists to skip problematic modules.
 
 Configurable namespace for custom registry sources.
+
+Customizable examples directory path for flexible project structures.
 
 `Advanced Terraform Support`
 
@@ -85,6 +89,8 @@ Integration with Go testing framework for CI/CD.
 `-namespace`: Terraform registry namespace (default: "cloudnationhq").
 
 `-skip-destroy`: Skip destroy operations after apply.
+
+`-examples-path`: Path to examples directory (defaults to '../examples').
 
 `Environment Variables`
 
