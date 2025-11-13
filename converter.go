@@ -33,8 +33,10 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 	}
 
 	moduleSource := fmt.Sprintf("%s/%s/%s", moduleInfo.Namespace, moduleInfo.Name, moduleInfo.Provider)
-	submodulePattern := fmt.Sprintf(`^%s/([^/]+)/%s//modules/(.*)$`,
-		regexp.QuoteMeta(moduleInfo.Namespace), regexp.QuoteMeta(moduleInfo.Provider))
+	submodulePattern := fmt.Sprintf(`^%s/%s/%s//modules/(.*)$`,
+		regexp.QuoteMeta(moduleInfo.Namespace),
+		regexp.QuoteMeta(moduleInfo.Name),
+		regexp.QuoteMeta(moduleInfo.Provider))
 	submoduleRegex := regexp.MustCompile(submodulePattern)
 
 	for _, file := range files {
@@ -138,8 +140,8 @@ func (c *DefaultSourceConverter) updateModuleBlock(block *hclwrite.Block, module
 		block.Body().RemoveAttribute("version")
 		return true
 	case submoduleRegex != nil:
-		if matches := submoduleRegex.FindStringSubmatch(sourceValue); len(matches) == 3 {
-			localPath := fmt.Sprintf("../../modules/%s", strings.TrimPrefix(matches[2], "/"))
+		if matches := submoduleRegex.FindStringSubmatch(sourceValue); len(matches) == 2 {
+			localPath := fmt.Sprintf("../../modules/%s", strings.TrimPrefix(matches[1], "/"))
 			block.Body().SetAttributeValue("source", cty.StringVal(localPath))
 			block.Body().RemoveAttribute("version")
 			return true
