@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.14.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.13.0...v1.14.0) (2025-11-13)
+
+
+### Features
+
+* **deps:** bump github.com/gruntwork-io/terratest from 0.50.0 to 0.52.0 ([#68](https://github.com/CloudNationHQ/az-cn-go-validor/issues/68)) ([9591ce1](https://github.com/CloudNationHQ/az-cn-go-validor/commit/9591ce1047ac95f9c8ec1d9e3a1493e418677f22))
+
+
+### Bug Fixes
+
+* prevent submodule regex from matching modules outside current repository ([#72](https://github.com/CloudNationHQ/az-cn-go-validor/issues/72)) ([7708222](https://github.com/CloudNationHQ/az-cn-go-validor/commit/7708222bc67e8ab32f51beff694cf714678edc0c))
+
 ## [1.13.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.12.7...v1.13.0) (2025-11-10)
 
 
