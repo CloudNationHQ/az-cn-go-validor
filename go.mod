@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/fatih/color v1.18.0
-	github.com/gruntwork-io/terratest v0.52.0
+	github.com/gruntwork-io/terratest v0.54.0
 	github.com/hashicorp/hcl/v2 v2.22.0
 	github.com/zclconf/go-cty v1.15.0
 )
