@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.15.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.14.0...v1.15.0) (2025-12-03)
+
+
+### Features
+
+* add testing and increase coverage ([#78](https://github.com/CloudNationHQ/az-cn-go-validor/issues/78)) ([6d011a8](https://github.com/CloudNationHQ/az-cn-go-validor/commit/6d011a8e2e56f42f832fabaf5f21985c660372fc))
+* **deps:** bump github.com/gruntwork-io/terratest from 0.52.0 to 0.54.0 ([#77](https://github.com/CloudNationHQ/az-cn-go-validor/issues/77)) ([b487ef1](https://github.com/CloudNationHQ/az-cn-go-validor/commit/b487ef1dc0b88b6cecd61e52dc34d9e760f34a8b))
+* **deps:** bump golang.org/x/crypto from 0.36.0 to 0.45.0 in /tests ([#75](https://github.com/CloudNationHQ/az-cn-go-validor/issues/75)) ([e792588](https://github.com/CloudNationHQ/az-cn-go-validor/commit/e792588324be017261c77823ed3d31a035effd85))
+* **deps:** bump golang.org/x/crypto from 0.41.0 to 0.45.0 ([#76](https://github.com/CloudNationHQ/az-cn-go-validor/issues/76)) ([14b337f](https://github.com/CloudNationHQ/az-cn-go-validor/commit/14b337f34fbdfa87b11d9d61b8d0f94d84e20005))
+
 ## [1.14.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.13.0...v1.14.0) (2025-11-13)
 
 
