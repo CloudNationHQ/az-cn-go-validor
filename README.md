@@ -34,11 +34,15 @@ See the [examples/](examples/) directory for sample Terraform modules and test c
 
 Run all tests (requires Terraform):
 
-```bash
-go test ./...
-```
+`go test ./...`
 
-Tests use mock Terraform files (no cloud credentials required) and validate both unit functionality and end-to-end public API behavior.
+Run tests with coverage:
+
+`go test -coverprofile=coverage.out ./...`
+
+`go tool cover -html=coverage.out`
+
+Tests use mock terraform files (no cloud credentials required) and validate both unit functionality and end-to-end public api behavior.
 
 ## Features
 
