@@ -30,7 +30,11 @@ Automate testing across teams and large codebases.
 
 See the [examples/](examples/) directory for sample Terraform modules and test configurations.
 
-Run tests from the `tests/` directory:
+Run unit tests:
+
+```
+go test ./...
+```
 
 ## Features
 

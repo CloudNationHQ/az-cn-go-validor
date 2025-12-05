@@ -1,6 +1,8 @@
 package validor
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,10 +61,8 @@ func TestNewModule(t *testing.T) {
 }
 
 func TestModuleManager_DiscoverModules(t *testing.T) {
-	// Create a temporary directory structure for testing
 	tmpDir := t.TempDir()
 
-	// Create test module directories
 	testModules := []string{"example1", "example2", "example3"}
 	for _, mod := range testModules {
 		modPath := filepath.Join(tmpDir, mod)
@@ -71,7 +71,6 @@ func TestModuleManager_DiscoverModules(t *testing.T) {
 		}
 	}
 
-	// Create a file (should be ignored)
 	if err := os.WriteFile(filepath.Join(tmpDir, "readme.txt"), []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -89,7 +88,6 @@ func TestModuleManager_DiscoverModules(t *testing.T) {
 			t.Errorf("DiscoverModules() found %d modules, want %d", len(modules), len(testModules))
 		}
 
-		// Check that all expected modules were discovered
 		moduleNames := make(map[string]bool)
 		for _, mod := range modules {
 			moduleNames[mod.Name] = true
@@ -298,5 +296,28 @@ func TestModule_Cleanup(t *testing.T) {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("File %s should have been removed", file)
 		}
+	}
+}
+
+func TestModule_DestroyErrors(t *testing.T) {
+	module := NewModule("test", t.TempDir())
+
+	module.destroyHook = func(ctx context.Context, tb *testing.T, m *Module) error {
+		return fmt.Errorf("destroy failed")
+	}
+	module.cleanupHook = func(ctx context.Context, tb *testing.T, m *Module) error {
+		return fmt.Errorf("cleanup failed")
+	}
+
+	err := module.Destroy(context.Background(), t)
+	if err == nil {
+		t.Fatalf("expected destroy to return error")
+	}
+
+	if len(module.Errors) != 2 {
+		t.Fatalf("expected 2 errors recorded, got %d", len(module.Errors))
+	}
+	if module.Errors[0] == "" || module.Errors[1] == "" {
+		t.Fatalf("expected error messages to be populated, got %#v", module.Errors)
 	}
 }
