@@ -9,8 +9,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GOCACHE: ${{ runner.temp }}/go-cache
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +20,8 @@ jobs:
         run: |
           go clean -testcache
           go test -count=1 -v -coverprofile=coverage.out ./...
+        env:
+          GOCACHE: ${{ runner.temp }}/go-cache
 
       - name: Display coverage summary
         run: go tool cover -func=coverage.out
