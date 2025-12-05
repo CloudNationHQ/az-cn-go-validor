@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GOCACHE: ${{ runner.temp }}/go-cache
     steps:
       - uses: actions/checkout@v4
 
@@ -23,3 +25,9 @@ jobs:
 
       - name: Display coverage summary
         run: go tool cover -func=coverage.out
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage.out
+          path: coverage.out

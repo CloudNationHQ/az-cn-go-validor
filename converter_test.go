@@ -194,6 +194,48 @@ func TestDefaultSourceConverter_updateVersionInContent(t *testing.T) {
 	}
 }
 
+func TestDefaultSourceConverter_ConvertToLocal_CancelledMidFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	tfContent := `
+module "one" {
+  source  = "cloudnationhq/mymodule/azure"
+  version = "~> 1.0"
+}
+
+module "two" {
+  source  = "cloudnationhq/mymodule/azure//modules/net"
+  version = "~> 1.0"
+}
+`
+	tfFile := filepath.Join(tmpDir, "main.tf")
+	if err := os.WriteFile(tfFile, []byte(tfContent), 0o644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	converter := NewSourceConverter(&mockRegistryClient{latestVersion: "1.0.0"})
+	moduleInfo := ModuleInfo{
+		Name:      "mymodule",
+		Provider:  "azure",
+		Namespace: "cloudnationhq",
+	}
+
+	filesToRestore, err := converter.ConvertToLocal(ctx, tmpDir, moduleInfo)
+	if err == nil && len(filesToRestore) > 0 {
+		t.Fatalf("expected no changes when context is cancelled, got %v", filesToRestore)
+	}
+	if err == nil {
+		t.Fatalf("expected cancellation error")
+	}
+
+	content, _ := os.ReadFile(tfFile)
+	if string(content) != tfContent {
+		t.Fatalf("file should remain unchanged when context is cancelled")
+	}
+}
+
 func TestDefaultSourceConverter_updateModuleBlock(t *testing.T) {
 	client := &mockRegistryClient{}
 	converter := NewSourceConverter(client).(*DefaultSourceConverter)

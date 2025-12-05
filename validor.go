@@ -171,8 +171,9 @@ func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 	if tc.UseLocal {
 		setup = createLocalSetupFunc(tc.Config)
 	}
-	runModuleTests(t, modules, tc.Parallel, tc.Config, setup, sourceType)
+	runModuleTestsFn(t, modules, tc.Parallel, tc.Config, setup, sourceType)
 }
+
 
 func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Config, setup TestSetupFunc, sourceType string) {
 	ctx := context.Background()
@@ -181,6 +182,7 @@ func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Conf
 	if setup != nil {
 		if err := setup(ctx, t, modules); err != nil {
 			t.Fatal(redError(fmt.Sprintf("Setup failed: %v", err)))
+			return
 		}
 	}
 
@@ -345,9 +347,7 @@ func extractModuleInfoFromRepo() ModuleInfo {
 }
 
 func getRepoNameFromGit(dir string) string {
-	cmd := exec.Command("git", "remote", "get-url", "origin")
-	cmd.Dir = dir
-	output, err := cmd.Output()
+	output, err := gitRemoteURL(dir)
 	if err != nil {
 		return ""
 	}
@@ -360,3 +360,11 @@ func getRepoNameFromGit(dir string) string {
 	}
 	return ""
 }
+
+var gitRemoteURL = func(dir string) ([]byte, error) {
+	cmd := exec.Command("git", "remote", "get-url", "origin")
+	cmd.Dir = dir
+	return cmd.Output()
+}
+
+var runModuleTestsFn = runModuleTests
