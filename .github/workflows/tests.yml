@@ -9,8 +9,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GOCACHE: ${{ runner.temp }}/go-cache
     steps:
       - uses: actions/checkout@v4
 
@@ -18,10 +16,15 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Run unit tests (no cache, verbose)
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Run tests (no cache, verbose)
         run: |
           go clean -testcache
           go test -count=1 -v -coverprofile=coverage.out ./...
+        env:
+          GOCACHE: ${{ runner.temp }}/go-cache
 
       - name: Display coverage summary
         run: go tool cover -func=coverage.out
