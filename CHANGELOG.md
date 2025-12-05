@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.16.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.15.0...v1.16.0) (2025-12-05)
+
+
+### Features
+
+* consolidate test files and improve coverage to 85.7% ([#80](https://github.com/CloudNationHQ/az-cn-go-validor/issues/80)) ([e976560](https://github.com/CloudNationHQ/az-cn-go-validor/commit/e976560b32a4f4d4d95a40497ab9a196adda04d0))
+
+
+### Bug Fixes
+
+* move GOCACHE env to step level for runner.temp context ([#82](https://github.com/CloudNationHQ/az-cn-go-validor/issues/82)) ([ab60e58](https://github.com/CloudNationHQ/az-cn-go-validor/commit/ab60e587270a4d291f98c7e27c7721b9337f5e0e))
+
 ## [1.15.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.14.0...v1.15.0) (2025-12-03)
 
 
