@@ -30,11 +30,15 @@ Automate testing across teams and large codebases.
 
 See the [examples/](examples/) directory for sample Terraform modules and test configurations.
 
-Run unit tests:
+## Testing
 
-```
+Run all tests (requires Terraform):
+
+```bash
 go test ./...
 ```
+
+Tests use mock Terraform files (no cloud credentials required) and validate both unit functionality and end-to-end public API behavior.
 
 ## Features
 

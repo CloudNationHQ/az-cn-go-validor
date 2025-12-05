@@ -498,21 +498,20 @@ func TestRunTests_WithSkipDestroy(t *testing.T) {
 	}
 }
 
+// ============================================================================
+// Public API Integration Tests (Require Terraform installed, no cloud creds)
+// ============================================================================
+
 func TestTestApplyNoError(t *testing.T) {
 	t.Run("with valid example flag", func(t *testing.T) {
 		tmpDir := setupMockExamplesDir(t)
 
-		// Note: This will actually try to run terraform on the mock files
-		// but since they're minimal, it should just validate basic flow
-		// In a real scenario, you'd mock the terraform execution
 		opts := []Option{
 			WithExample("example1"),
 			WithExamplesPath(tmpDir),
-			WithSkipDestroy(true), // Skip destroy to speed up test
+			WithSkipDestroy(true),
 		}
 
-		// This function calls t.Fatal if -example is not set
-		// We're testing the happy path where it IS set
 		TestApplyNoError(t, opts...)
 	})
 
@@ -531,10 +530,6 @@ func TestTestApplyNoError(t *testing.T) {
 
 func TestTestApplyNoError_MissingExampleFlag(t *testing.T) {
 	t.Run("should fail when example flag not set", func(t *testing.T) {
-		// We expect this to call t.Fatal
-		// To test this properly, we'd need to use a subprocess pattern
-		// For now, we'll just document that this case is handled in the code
-		// See validor.go:88-90 for the validation
 		t.Skip("Testing t.Fatal requires subprocess pattern - validation code exists at validor.go:88-90")
 	})
 }
@@ -543,7 +538,6 @@ func TestTestApplyAllParallel(t *testing.T) {
 	tmpDir := setupMockExamplesDir(t)
 
 	t.Run("discovers and runs all modules in parallel", func(t *testing.T) {
-		// Test with valid examples directory
 		TestApplyAllParallel(t, WithExamplesPath(tmpDir), WithSkipDestroy(true))
 	})
 }
@@ -558,29 +552,24 @@ func TestTestApplyAllSequential(t *testing.T) {
 
 func TestTestApplyAllLocal(t *testing.T) {
 	t.Run("discovers and runs all modules with local source", func(t *testing.T) {
-		// Create a mock terraform module directory structure
-		// The directory name must match terraform-<provider>-<name> pattern
 		tmpRoot := t.TempDir()
 		moduleDir := filepath.Join(tmpRoot, "terraform-azure-testmodule")
 		if err := os.MkdirAll(moduleDir, 0755); err != nil {
 			t.Fatalf("failed to create module dir: %v", err)
 		}
 
-		// Create examples subdirectory
 		examplesDir := filepath.Join(moduleDir, "examples")
 		for _, example := range []string{"example1", "example2"} {
 			examplePath := filepath.Join(examplesDir, example)
 			if err := os.MkdirAll(examplePath, 0755); err != nil {
 				t.Fatalf("failed to create example dir: %v", err)
 			}
-			// Create minimal main.tf
 			mainTf := filepath.Join(examplePath, "main.tf")
 			if err := os.WriteFile(mainTf, []byte("# mock terraform file"), 0644); err != nil {
 				t.Fatalf("failed to create main.tf: %v", err)
 			}
 		}
 
-		// Change to the mock module directory so extractModuleInfoFromRepo works
 		originalWd, err := os.Getwd()
 		if err != nil {
 			t.Fatalf("failed to get working dir: %v", err)
@@ -591,12 +580,10 @@ func TestTestApplyAllLocal(t *testing.T) {
 			t.Fatalf("failed to change dir: %v", err)
 		}
 
-		// Now run the test - it should extract module info from the directory name
 		TestApplyAllLocal(t, WithExamplesPath(examplesDir), WithSkipDestroy(true))
 	})
 }
 
-// Test that all public API functions respect Config options
 func TestPublicAPI_ConfigOptions(t *testing.T) {
 	t.Run("TestApplyAllParallel with exception", func(t *testing.T) {
 		tmpDir := setupMockExamplesDir(t)
@@ -617,14 +604,12 @@ func TestPublicAPI_ConfigOptions(t *testing.T) {
 	})
 
 	t.Run("TestApplyAllLocal with skip destroy", func(t *testing.T) {
-		// TestApplyAllLocal needs terraform-<provider>-<name> directory structure
 		tmpRoot := t.TempDir()
 		moduleDir := filepath.Join(tmpRoot, "terraform-azure-testmodule")
 		if err := os.MkdirAll(moduleDir, 0755); err != nil {
 			t.Fatalf("failed to create module dir: %v", err)
 		}
 
-		// Create examples subdirectory
 		examplesDir := filepath.Join(moduleDir, "examples")
 		for _, example := range []string{"example1", "example2"} {
 			examplePath := filepath.Join(examplesDir, example)
@@ -637,7 +622,6 @@ func TestPublicAPI_ConfigOptions(t *testing.T) {
 			}
 		}
 
-		// Change to the mock module directory
 		originalWd, err := os.Getwd()
 		if err != nil {
 			t.Fatalf("failed to get working dir: %v", err)
@@ -654,3 +638,4 @@ func TestPublicAPI_ConfigOptions(t *testing.T) {
 		)
 	})
 }
+

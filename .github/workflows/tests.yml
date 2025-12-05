@@ -16,7 +16,10 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Run unit tests (no cache, verbose)
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Run tests (no cache, verbose)
         run: |
           go clean -testcache
           go test -count=1 -v -coverprofile=coverage.out ./...
