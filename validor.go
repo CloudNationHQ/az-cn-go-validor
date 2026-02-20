@@ -11,10 +11,14 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
-var globalConfig *Config
+var (
+	globalConfigOnce sync.Once
+	globalConfig     *Config
+)
 
 type Config struct {
 	SkipDestroy   bool
@@ -59,7 +63,7 @@ func NewConfig(opts ...Option) *Config {
 	return config
 }
 
-func init() {
+func initConfig() {
 	globalConfig = &Config{}
 	flag.BoolVar(&globalConfig.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
 	flag.StringVar(&globalConfig.Exception, "exception", "", "Comma-separated list of examples to exclude")
@@ -70,6 +74,7 @@ func init() {
 }
 
 func GetConfig() *Config {
+	globalConfigOnce.Do(initConfig)
 	return globalConfig
 }
 
@@ -173,7 +178,6 @@ func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 	}
 	runModuleTestsFn(t, modules, tc.Parallel, tc.Config, setup, sourceType)
 }
-
 
 func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Config, setup TestSetupFunc, sourceType string) {
 	ctx := context.Background()
