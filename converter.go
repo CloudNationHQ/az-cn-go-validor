@@ -14,6 +14,8 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
+var versionRegex = regexp.MustCompile(`(version\s*=\s*")[^"]*(")`)
+
 type DefaultSourceConverter struct {
 	registryClient RegistryClient
 }
@@ -37,7 +39,10 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 		regexp.QuoteMeta(moduleInfo.Namespace),
 		regexp.QuoteMeta(moduleInfo.Name),
 		regexp.QuoteMeta(moduleInfo.Provider))
-	submoduleRegex := regexp.MustCompile(submodulePattern)
+	submoduleRegex, err := regexp.Compile(submodulePattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile submodule regex: %w", err)
+	}
 
 	for _, file := range files {
 		select {
@@ -61,7 +66,7 @@ func (c *DefaultSourceConverter) ConvertToLocal(ctx context.Context, modulePath 
 			continue
 		}
 
-		if err := os.WriteFile(file, parsedFile.Bytes(), 0644); err != nil {
+		if err := os.WriteFile(file, parsedFile.Bytes(), 0o644); err != nil {
 			return filesToRestore, fmt.Errorf("failed to write file %s: %w", file, err)
 		}
 
@@ -87,7 +92,7 @@ func (c *DefaultSourceConverter) RevertToRegistry(ctx context.Context, filesToRe
 
 		latestVersion, err := c.registryClient.GetLatestVersion(ctx, restore.Namespace, restore.ModuleName, restore.Provider)
 		if err != nil {
-			if writeErr := os.WriteFile(restore.Path, []byte(restore.OriginalContent), 0644); writeErr != nil {
+			if writeErr := os.WriteFile(restore.Path, []byte(restore.OriginalContent), 0o644); writeErr != nil {
 				return fmt.Errorf("failed to restore file %s: %w", restore.Path, writeErr)
 			}
 			continue
@@ -95,7 +100,7 @@ func (c *DefaultSourceConverter) RevertToRegistry(ctx context.Context, filesToRe
 
 		updatedContent := c.updateVersionInContent(restore.OriginalContent, latestVersion)
 
-		if err := os.WriteFile(restore.Path, []byte(updatedContent), 0644); err != nil {
+		if err := os.WriteFile(restore.Path, []byte(updatedContent), 0o644); err != nil {
 			return fmt.Errorf("failed to write updated file %s: %w", restore.Path, err)
 		}
 	}
@@ -103,7 +108,6 @@ func (c *DefaultSourceConverter) RevertToRegistry(ctx context.Context, filesToRe
 }
 
 func (c *DefaultSourceConverter) updateVersionInContent(content, latestVersion string) string {
-	versionRegex := regexp.MustCompile(`(version\s*=\s*")[^"]*(")`)
 	if versionRegex.MatchString(content) {
 		return versionRegex.ReplaceAllString(content, fmt.Sprintf("${1}~> %s${2}", latestVersion))
 	}

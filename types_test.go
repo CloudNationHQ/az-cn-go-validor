@@ -2,6 +2,7 @@ package validor
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -39,7 +40,7 @@ func TestTestResults_AddModule(t *testing.T) {
 
 	t.Run("add failed module", func(t *testing.T) {
 		module := NewModule("test2", "/path/test2")
-		module.Errors = append(module.Errors, "test error")
+		module.Errors = append(module.Errors, fmt.Errorf("test error"))
 		results.AddModule(module)
 
 		modules, failedModules := results.GetResults()
@@ -55,19 +56,17 @@ func TestTestResults_AddModule(t *testing.T) {
 		results := NewTestResults()
 		done := make(chan bool)
 
-		// Add modules concurrently
 		for i := 0; i < 10; i++ {
 			go func(id int) {
 				module := NewModule("test", "/path")
 				if id%2 == 0 {
-					module.Errors = append(module.Errors, "error")
+					module.Errors = append(module.Errors, fmt.Errorf("error"))
 				}
 				results.AddModule(module)
 				done <- true
 			}(i)
 		}
 
-		// Wait for all goroutines
 		for i := 0; i < 10; i++ {
 			<-done
 		}
@@ -142,7 +141,6 @@ func TestModuleError_Unwrap(t *testing.T) {
 		t.Errorf("Unwrap() should return original error")
 	}
 
-	// Test with errors.Is
 	if !errors.Is(moduleErr, originalErr) {
 		t.Error("errors.Is should work with ModuleError")
 	}

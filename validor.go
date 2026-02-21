@@ -10,13 +10,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
-)
-
-var (
-	globalConfigOnce sync.Once
-	globalConfig     *Config
+	"time"
 )
 
 type Config struct {
@@ -54,27 +49,35 @@ func WithExamplesPath(path string) Option {
 	return func(c *Config) { c.ExamplesPath = path }
 }
 
+func WithNamespace(namespace string) Option {
+	return func(c *Config) { c.Namespace = namespace }
+}
+
 func NewConfig(opts ...Option) *Config {
-	config := &Config{}
+	config := &Config{
+		Namespace: "cloudnationhq", // default
+	}
 	for _, opt := range opts {
 		opt(config)
 	}
 	return config
 }
 
-func initConfig() {
-	globalConfig = &Config{}
-	flag.BoolVar(&globalConfig.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
-	flag.StringVar(&globalConfig.Exception, "exception", "", "Comma-separated list of examples to exclude")
-	flag.StringVar(&globalConfig.Example, "example", "", "Specific example(s) to test (comma-separated)")
-	flag.BoolVar(&globalConfig.Local, "local", false, "Use local source for testing")
-	flag.StringVar(&globalConfig.Namespace, "namespace", "cloudnationhq", "Terraform registry namespace")
-	flag.StringVar(&globalConfig.ExamplesPath, "examples-path", "", "Path to examples directory (defaults to '../examples')")
-}
+func NewConfigFromFlags() *Config {
+	config := &Config{
+		Namespace: "cloudnationhq",
+	}
 
-func GetConfig() *Config {
-	globalConfigOnce.Do(initConfig)
-	return globalConfig
+	flag.BoolVar(&config.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
+	flag.StringVar(&config.Exception, "exception", "", "Comma-separated list of examples to exclude")
+	flag.StringVar(&config.Example, "example", "", "Specific example(s) to test (comma-separated)")
+	flag.BoolVar(&config.Local, "local", false, "Use local source for testing")
+	flag.StringVar(&config.Namespace, "namespace", config.Namespace, "Terraform registry namespace")
+	flag.StringVar(&config.ExamplesPath, "examples-path", "", "Path to examples directory (defaults to '../examples')")
+	flag.Parse()
+
+	config.ParseExceptionList()
+	return config
 }
 
 func (c *Config) ParseExceptionList() {
@@ -153,7 +156,7 @@ func WithTestExamplesPath(path string) TestOption {
 
 func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 	tc := &TestConfig{
-		Parallel: true, // default to parallel
+		Parallel: true,
 	}
 
 	for _, opt := range opts {
@@ -161,8 +164,7 @@ func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 	}
 
 	if tc.Config == nil {
-		tc.Config = GetConfig()
-		tc.Config.ParseExceptionList()
+		tc.Config = NewConfig()
 	}
 
 	if tc.ExamplesPath != "" {
@@ -222,12 +224,7 @@ func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Conf
 }
 
 func setupConfigWithOptions(opts ...Option) *Config {
-	config := GetConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-	config.ParseExceptionList()
-	return config
+	return NewConfig(opts...)
 }
 
 func getExamplesPath(config *Config) string {
@@ -299,7 +296,9 @@ func createLocalSetupFunc(config *Config) TestSetupFunc {
 		allFilesToRestore := convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo, getExamplesPath(config))
 
 		t.Cleanup(func() {
-			if err := converter.RevertToRegistry(context.Background(), allFilesToRestore); err != nil {
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := converter.RevertToRegistry(cleanupCtx, allFilesToRestore); err != nil {
 				t.Logf("Warning: Failed to revert files to registry source: %v", err)
 			}
 		})

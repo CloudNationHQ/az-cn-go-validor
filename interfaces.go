@@ -2,13 +2,18 @@ package validor
 
 import (
 	"context"
-	"testing"
 )
 
+type Logger interface {
+	Helper()
+	Logf(format string, args ...any)
+	Log(args ...any)
+}
+
 type ModuleRunner interface {
-	Apply(ctx context.Context, t *testing.T) error
-	Destroy(ctx context.Context, t *testing.T) error
-	Cleanup(ctx context.Context, t *testing.T) error
+	Apply(ctx context.Context, logger Logger) error
+	Destroy(ctx context.Context, logger Logger) error
+	Cleanup(ctx context.Context, logger Logger) error
 }
 
 type ModuleDiscoverer interface {
@@ -26,6 +31,6 @@ type RegistryClient interface {
 }
 
 type TestRunner interface {
-	RunTests(t *testing.T, modules []*Module, parallel bool, config *Config)
-	RunLocalTests(t *testing.T, examplesPath string) error
+	RunTests(logger Logger, modules []*Module, parallel bool, config *Config)
+	RunLocalTests(logger Logger, examplesPath string) error
 }

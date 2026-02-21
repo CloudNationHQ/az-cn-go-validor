@@ -84,13 +84,13 @@ Automatic cleanup of generated files and states.
 
 Structured error types for better debugging.
 
-Outputstest summaries with failure details.
+Outputs test summaries with failure details.
 
 Integration with Go testing framework for CI/CD.
 
 ## Configuration
 
-`Command-Line Flags`
+### Command-Line Flags
 
 `-example`: Comma-separated list of specific examples to test.
 
@@ -104,19 +104,18 @@ Integration with Go testing framework for CI/CD.
 
 `-examples-path`: Path to examples directory (defaults to '../examples').
 
-`Environment Variables`
+### Programmatic Configuration
 
-For CI/CD pipelines, configure via environment variables:
+Use functional options for library integration:
 
-`VALIDOR_EXAMPLE`: Specific examples to test.
-
-`VALIDOR_EXCEPTION`: Examples to exclude.
-
-`VALIDOR_LOCAL`: Enable local source testing (true/false).
-
-`VALIDOR_NAMESPACE`: Registry namespace.
-
-`VALIDOR_SKIP_DESTROY`: Skip destroy (true/false).
+```
+config := NewConfig(
+    WithSkipDestroy(true),
+    WithLocal(true),
+    WithNamespace("my-namespace"),
+    WithException("example1,example2"),
+)
+```
 
 ### Notes
 

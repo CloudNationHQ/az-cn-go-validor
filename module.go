@@ -15,7 +15,7 @@ type Module struct {
 	Name        string
 	Path        string
 	Options     *terraform.Options
-	Errors      []string
+	Errors      []error
 	ApplyFailed bool
 
 	applyHook   func(ctx context.Context, t *testing.T, m *Module) error
@@ -54,7 +54,7 @@ func NewModule(name, path string) *Module {
 			NoColor:         true,
 			TerraformBinary: "terraform",
 		},
-		Errors:      []string{},
+		Errors:      []error{},
 		ApplyFailed: false,
 	}
 }
@@ -96,7 +96,7 @@ func (m *Module) Apply(ctx context.Context, t *testing.T) error {
 	if err != nil {
 		m.ApplyFailed = true
 		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform apply", Err: err}
-		m.Errors = append(m.Errors, wrappedErr.Error())
+		m.Errors = append(m.Errors, wrappedErr)
 		t.Log(redError(wrappedErr.Error()))
 		return wrappedErr
 	}
@@ -110,14 +110,14 @@ func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 		destroyErr := m.destroyHook(ctx, t, m)
 		if destroyErr != nil && !m.ApplyFailed {
 			wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform destroy", Err: destroyErr}
-			m.Errors = append(m.Errors, wrappedErr.Error())
+			m.Errors = append(m.Errors, wrappedErr)
 			t.Log(redError(wrappedErr.Error()))
 		}
 
 		if m.cleanupHook != nil && !m.ApplyFailed {
 			if err := m.cleanupHook(ctx, t, m); err != nil {
 				wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "cleanup", Err: err}
-				m.Errors = append(m.Errors, wrappedErr.Error())
+				m.Errors = append(m.Errors, wrappedErr)
 				t.Log(redError(wrappedErr.Error()))
 			}
 		}
@@ -130,13 +130,13 @@ func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 
 	if destroyErr != nil && !m.ApplyFailed {
 		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform destroy", Err: destroyErr}
-		m.Errors = append(m.Errors, wrappedErr.Error())
+		m.Errors = append(m.Errors, wrappedErr)
 		t.Log(redError(wrappedErr.Error()))
 	}
 
 	if err := m.Cleanup(ctx, t); err != nil && !m.ApplyFailed {
 		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "cleanup", Err: err}
-		m.Errors = append(m.Errors, wrappedErr.Error())
+		m.Errors = append(m.Errors, wrappedErr)
 		t.Log(redError(wrappedErr.Error()))
 	}
 
@@ -186,8 +186,8 @@ func PrintModuleSummary(tb testLogger, modules []*Module) {
 	if len(failedModules) > 0 {
 		for _, module := range failedModules {
 			tb.Log(redError("Module " + module.Name + " failed with errors:"))
-			for i, errMsg := range module.Errors {
-				errText := fmt.Sprintf("  %d. %s", i+1, errMsg)
+			for i, err := range module.Errors {
+				errText := fmt.Sprintf("  %d. %v", i+1, err)
 				tb.Log(redError(errText))
 			}
 			tb.Log("")

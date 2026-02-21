@@ -246,7 +246,7 @@ func TestPrintModuleSummary(t *testing.T) {
 			{
 				Name:   "example2",
 				Path:   "/path/example2",
-				Errors: []string{"Error 1", "Error 2"},
+				Errors: []error{fmt.Errorf("Error 1"), fmt.Errorf("Error 2")},
 			},
 		}
 
@@ -317,7 +317,7 @@ func TestModule_DestroyErrors(t *testing.T) {
 	if len(module.Errors) != 2 {
 		t.Fatalf("expected 2 errors recorded, got %d", len(module.Errors))
 	}
-	if module.Errors[0] == "" || module.Errors[1] == "" {
+	if module.Errors[0] == nil || module.Errors[1] == nil {
 		t.Fatalf("expected error messages to be populated, got %#v", module.Errors)
 	}
 }
