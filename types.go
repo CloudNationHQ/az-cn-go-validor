@@ -1,17 +1,9 @@
 package validor
 
 import (
-	"context"
 	"fmt"
 	"sync"
-	"testing"
 )
-
-type ModuleProcessor interface {
-	Apply(ctx context.Context, t *testing.T) error
-	Destroy(ctx context.Context, t *testing.T) error
-	CleanupFiles(t *testing.T) error
-}
 
 type TestResults struct {
 	mu            sync.RWMutex
