@@ -186,7 +186,6 @@ func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Conf
 	if setup != nil {
 		if err := setup(ctx, t, modules); err != nil {
 			t.Fatal(redError(fmt.Sprintf("Setup failed: %v", err)))
-			return
 		}
 	}
 
