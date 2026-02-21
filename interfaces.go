@@ -12,7 +12,7 @@ type ModuleRunner interface {
 }
 
 type ModuleDiscoverer interface {
-	DiscoverModules(ctx context.Context) ([]ModuleRunner, error)
+	DiscoverModules() ([]*Module, error)
 	SetConfig(config *Config)
 }
 
@@ -26,6 +26,6 @@ type RegistryClient interface {
 }
 
 type TestRunner interface {
-	RunTests(ctx context.Context, t *testing.T, modules []ModuleRunner, parallel bool, config *Config)
-	RunLocalTests(ctx context.Context, t *testing.T, examplesPath string) error
+	RunTests(t *testing.T, modules []*Module, parallel bool, config *Config)
+	RunLocalTests(t *testing.T, examplesPath string) error
 }
