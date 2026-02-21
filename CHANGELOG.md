@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.16.1...v1.17.0) (2026-02-21)
+
+
+### Features
+
+* small overall refactor ([#109](https://github.com/CloudNationHQ/az-cn-go-validor/issues/109)) ([6cdbec4](https://github.com/CloudNationHQ/az-cn-go-validor/commit/6cdbec4882fc330aa35771eba128b4811b5d1566))
+
 ## [1.16.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.16.0...v1.16.1) (2026-02-21)
 
 
