@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -329,24 +328,33 @@ func extractModuleInfoFromRepo() ModuleInfo {
 	}
 
 	if repoName := getRepoNameFromGit(wd); repoName != "" {
-		re := regexp.MustCompile(`^terraform-([^-]+)-(.+)$`)
-		if matches := re.FindStringSubmatch(repoName); len(matches) > 2 {
-			return ModuleInfo{
-				Name:     matches[2],
-				Provider: matches[1],
-			}
+		if info, ok := parseModuleName(repoName); ok {
+			return info
 		}
 	}
 
 	repoName := filepath.Base(wd)
-	re := regexp.MustCompile(`^terraform-([^-]+)-(.+)$`)
-	if matches := re.FindStringSubmatch(repoName); len(matches) > 2 {
-		return ModuleInfo{
-			Name:     matches[2],
-			Provider: matches[1],
-		}
+	if info, ok := parseModuleName(repoName); ok {
+		return info
 	}
 	return ModuleInfo{}
+}
+
+func parseModuleName(repoName string) (ModuleInfo, bool) {
+	const prefix = "terraform-"
+	if !strings.HasPrefix(repoName, prefix) {
+		return ModuleInfo{}, false
+	}
+
+	parts := strings.SplitN(repoName[len(prefix):], "-", 2)
+	if len(parts) != 2 {
+		return ModuleInfo{}, false
+	}
+
+	return ModuleInfo{
+		Provider: parts[0],
+		Name:     parts[1],
+	}, true
 }
 
 func getRepoNameFromGit(dir string) string {
