@@ -94,7 +94,7 @@ func TestApplyNoError(t *testing.T, opts ...Option) {
 		t.Fatal(redError("-example flag is not set"))
 	}
 	modules := createModulesFromNames(parseExampleList(config.Example), getExamplesPath(config))
-	sourceType := map[bool]string{true: "local", false: "registry"}[config.Local]
+	sourceType := BoolToStr(config.Local, "local", "registry")
 	var setup TestSetupFunc
 	if config.Local {
 		setup = createLocalSetupFunc(config)
@@ -171,7 +171,7 @@ func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 	}
 
 	modules := createModulesFromNames(tc.ModuleNames, getExamplesPath(tc.Config))
-	sourceType := map[bool]string{true: "local", false: "registry"}[tc.UseLocal]
+	sourceType := BoolToStr(tc.UseLocal, "local", "registry")
 	var setup TestSetupFunc
 	if tc.UseLocal {
 		setup = createLocalSetupFunc(tc.Config)
