@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.17.0...v1.17.1) (2026-02-23)
+
+
+### Bug Fixes
+
+* preallocate slices in extractModuleNames and createModulesFromNames ([#111](https://github.com/CloudNationHQ/az-cn-go-validor/issues/111)) ([2d886a4](https://github.com/CloudNationHQ/az-cn-go-validor/commit/2d886a4bce41e560bc3add10605a5103bc054331)), closes [#89](https://github.com/CloudNationHQ/az-cn-go-validor/issues/89)
+* remove redundant zero value initialization (fixes [#91](https://github.com/CloudNationHQ/az-cn-go-validor/issues/91)) ([#112](https://github.com/CloudNationHQ/az-cn-go-validor/issues/112)) ([7c505ba](https://github.com/CloudNationHQ/az-cn-go-validor/commit/7c505badce023a42e15921f1a781419e0b5cc285))
+
 ## [1.17.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.16.1...v1.17.0) (2026-02-21)
 
 
