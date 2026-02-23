@@ -12,10 +12,7 @@ type TestResults struct {
 }
 
 func NewTestResults() *TestResults {
-	return &TestResults{
-		modules:       make([]*Module, 0),
-		failedModules: make([]*Module, 0),
-	}
+	return &TestResults{}
 }
 
 func (tr *TestResults) AddModule(module *Module) {

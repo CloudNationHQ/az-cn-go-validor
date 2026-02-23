@@ -54,8 +54,6 @@ func NewModule(name, path string) *Module {
 			NoColor:         true,
 			TerraformBinary: "terraform",
 		},
-		Errors:      []error{},
-		ApplyFailed: false,
 	}
 }
 
