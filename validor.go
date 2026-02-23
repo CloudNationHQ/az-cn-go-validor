@@ -247,7 +247,7 @@ func discoverModules(t *testing.T, config *Config) []*Module {
 }
 
 func extractModuleNames(modules []*Module) []string {
-	var moduleNames []string
+	moduleNames := make([]string, 0, len(modules))
 	for _, module := range modules {
 		moduleNames = append(moduleNames, module.Name)
 	}
@@ -255,7 +255,7 @@ func extractModuleNames(modules []*Module) []string {
 }
 
 func createModulesFromNames(moduleNames []string, basePath string) []*Module {
-	var modules []*Module
+	modules := make([]*Module, 0, len(moduleNames))
 	for _, name := range moduleNames {
 		path := filepath.Join(basePath, name)
 		modules = append(modules, NewModule(name, path))
