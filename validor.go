@@ -14,6 +14,19 @@ import (
 	"time"
 )
 
+var flagConfig = &Config{
+	Namespace: "cloudnationhq",
+}
+
+func init() {
+	flag.BoolVar(&flagConfig.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
+	flag.StringVar(&flagConfig.Exception, "exception", "", "Comma-separated list of examples to exclude")
+	flag.StringVar(&flagConfig.Example, "example", "", "Specific example(s) to test (comma-separated)")
+	flag.BoolVar(&flagConfig.Local, "local", false, "Use local source for testing")
+	flag.StringVar(&flagConfig.Namespace, "namespace", flagConfig.Namespace, "Terraform registry namespace")
+	flag.StringVar(&flagConfig.ExamplesPath, "examples-path", "", "Path to examples directory (defaults to '../examples')")
+}
+
 type Config struct {
 	SkipDestroy   bool
 	Exception     string
@@ -64,20 +77,11 @@ func NewConfig(opts ...Option) *Config {
 }
 
 func NewConfigFromFlags() *Config {
-	config := &Config{
-		Namespace: "cloudnationhq",
+	if !flag.Parsed() {
+		flag.Parse()
 	}
-
-	flag.BoolVar(&config.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
-	flag.StringVar(&config.Exception, "exception", "", "Comma-separated list of examples to exclude")
-	flag.StringVar(&config.Example, "example", "", "Specific example(s) to test (comma-separated)")
-	flag.BoolVar(&config.Local, "local", false, "Use local source for testing")
-	flag.StringVar(&config.Namespace, "namespace", config.Namespace, "Terraform registry namespace")
-	flag.StringVar(&config.ExamplesPath, "examples-path", "", "Path to examples directory (defaults to '../examples')")
-	flag.Parse()
-
-	config.ParseExceptionList()
-	return config
+	flagConfig.ParseExceptionList()
+	return flagConfig
 }
 
 func (c *Config) ParseExceptionList() {
@@ -224,6 +228,9 @@ func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Conf
 }
 
 func setupConfigWithOptions(opts ...Option) *Config {
+	if len(opts) == 0 {
+		return NewConfigFromFlags()
+	}
 	return NewConfig(opts...)
 }
 
