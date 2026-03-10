@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.18.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.17.1...v1.18.0) (2026-03-10)
+
+
+### Features
+
+* **deps:** bump github.com/gruntwork-io/terratest from 0.54.0 to 0.56.0 ([#84](https://github.com/CloudNationHQ/az-cn-go-validor/issues/84)) ([ef14046](https://github.com/CloudNationHQ/az-cn-go-validor/commit/ef14046366cbb5f029adf9a49eb8f661c6c8335f))
+* **deps:** bump github.com/zclconf/go-cty from 1.15.0 to 1.18.0 ([#114](https://github.com/CloudNationHQ/az-cn-go-validor/issues/114)) ([b7237ed](https://github.com/CloudNationHQ/az-cn-go-validor/commit/b7237ed2602bc3954bedd0c832dea3bd60f3f175))
+
+
+### Bug Fixes
+
+* flag registration fix ([#115](https://github.com/CloudNationHQ/az-cn-go-validor/issues/115)) ([261cc59](https://github.com/CloudNationHQ/az-cn-go-validor/commit/261cc593357a2092b33fe6707d8b84bbf8e58677))
+
 ## [1.17.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.17.0...v1.17.1) (2026-02-23)
 
 
