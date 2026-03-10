@@ -251,15 +251,9 @@ func TestTestConfig_Options(t *testing.T) {
 }
 
 func TestSetupConfigWithOptions(t *testing.T) {
-	originalConfig := globalConfig
-	defer func() { globalConfig = originalConfig }()
-
-	globalConfig = &Config{
-		Exception: "ex1,ex2",
-	}
-
-	t.Run("apply options to global config", func(t *testing.T) {
+	t.Run("apply options to create new config", func(t *testing.T) {
 		config := setupConfigWithOptions(
+			WithException("ex1,ex2"),
 			WithSkipDestroy(true),
 			WithLocal(true),
 		)

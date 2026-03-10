@@ -106,7 +106,7 @@ func TestPrintModuleSummary_CapturesOutput(t *testing.T) {
 	modules := []*Module{
 		{
 			Name:   "broken",
-			Errors: []string{"terraform apply failed"},
+			Errors: []error{fmt.Errorf("terraform apply failed")},
 		},
 		NewModule("ok", t.TempDir()),
 	}

@@ -8,13 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
-
-var globalConfig *Config
 
 type Config struct {
 	SkipDestroy   bool
@@ -51,26 +49,35 @@ func WithExamplesPath(path string) Option {
 	return func(c *Config) { c.ExamplesPath = path }
 }
 
+func WithNamespace(namespace string) Option {
+	return func(c *Config) { c.Namespace = namespace }
+}
+
 func NewConfig(opts ...Option) *Config {
-	config := &Config{}
+	config := &Config{
+		Namespace: "cloudnationhq", // default
+	}
 	for _, opt := range opts {
 		opt(config)
 	}
 	return config
 }
 
-func init() {
-	globalConfig = &Config{}
-	flag.BoolVar(&globalConfig.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
-	flag.StringVar(&globalConfig.Exception, "exception", "", "Comma-separated list of examples to exclude")
-	flag.StringVar(&globalConfig.Example, "example", "", "Specific example(s) to test (comma-separated)")
-	flag.BoolVar(&globalConfig.Local, "local", false, "Use local source for testing")
-	flag.StringVar(&globalConfig.Namespace, "namespace", "cloudnationhq", "Terraform registry namespace")
-	flag.StringVar(&globalConfig.ExamplesPath, "examples-path", "", "Path to examples directory (defaults to '../examples')")
-}
+func NewConfigFromFlags() *Config {
+	config := &Config{
+		Namespace: "cloudnationhq",
+	}
 
-func GetConfig() *Config {
-	return globalConfig
+	flag.BoolVar(&config.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
+	flag.StringVar(&config.Exception, "exception", "", "Comma-separated list of examples to exclude")
+	flag.StringVar(&config.Example, "example", "", "Specific example(s) to test (comma-separated)")
+	flag.BoolVar(&config.Local, "local", false, "Use local source for testing")
+	flag.StringVar(&config.Namespace, "namespace", config.Namespace, "Terraform registry namespace")
+	flag.StringVar(&config.ExamplesPath, "examples-path", "", "Path to examples directory (defaults to '../examples')")
+	flag.Parse()
+
+	config.ParseExceptionList()
+	return config
 }
 
 func (c *Config) ParseExceptionList() {
@@ -89,7 +96,7 @@ func TestApplyNoError(t *testing.T, opts ...Option) {
 		t.Fatal(redError("-example flag is not set"))
 	}
 	modules := createModulesFromNames(parseExampleList(config.Example), getExamplesPath(config))
-	sourceType := map[bool]string{true: "local", false: "registry"}[config.Local]
+	sourceType := BoolToStr(config.Local, "local", "registry")
 	var setup TestSetupFunc
 	if config.Local {
 		setup = createLocalSetupFunc(config)
@@ -149,7 +156,7 @@ func WithTestExamplesPath(path string) TestOption {
 
 func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 	tc := &TestConfig{
-		Parallel: true, // default to parallel
+		Parallel: true,
 	}
 
 	for _, opt := range opts {
@@ -157,8 +164,7 @@ func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 	}
 
 	if tc.Config == nil {
-		tc.Config = GetConfig()
-		tc.Config.ParseExceptionList()
+		tc.Config = NewConfig()
 	}
 
 	if tc.ExamplesPath != "" {
@@ -166,14 +172,13 @@ func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
 	}
 
 	modules := createModulesFromNames(tc.ModuleNames, getExamplesPath(tc.Config))
-	sourceType := map[bool]string{true: "local", false: "registry"}[tc.UseLocal]
+	sourceType := BoolToStr(tc.UseLocal, "local", "registry")
 	var setup TestSetupFunc
 	if tc.UseLocal {
 		setup = createLocalSetupFunc(tc.Config)
 	}
 	runModuleTestsFn(t, modules, tc.Parallel, tc.Config, setup, sourceType)
 }
-
 
 func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Config, setup TestSetupFunc, sourceType string) {
 	ctx := context.Background()
@@ -182,7 +187,6 @@ func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Conf
 	if setup != nil {
 		if err := setup(ctx, t, modules); err != nil {
 			t.Fatal(redError(fmt.Sprintf("Setup failed: %v", err)))
-			return
 		}
 	}
 
@@ -220,12 +224,7 @@ func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Conf
 }
 
 func setupConfigWithOptions(opts ...Option) *Config {
-	config := GetConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-	config.ParseExceptionList()
-	return config
+	return NewConfig(opts...)
 }
 
 func getExamplesPath(config *Config) string {
@@ -248,7 +247,7 @@ func discoverModules(t *testing.T, config *Config) []*Module {
 }
 
 func extractModuleNames(modules []*Module) []string {
-	var moduleNames []string
+	moduleNames := make([]string, 0, len(modules))
 	for _, module := range modules {
 		moduleNames = append(moduleNames, module.Name)
 	}
@@ -256,7 +255,7 @@ func extractModuleNames(modules []*Module) []string {
 }
 
 func createModulesFromNames(moduleNames []string, basePath string) []*Module {
-	var modules []*Module
+	modules := make([]*Module, 0, len(moduleNames))
 	for _, name := range moduleNames {
 		path := filepath.Join(basePath, name)
 		modules = append(modules, NewModule(name, path))
@@ -297,7 +296,9 @@ func createLocalSetupFunc(config *Config) TestSetupFunc {
 		allFilesToRestore := convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo, getExamplesPath(config))
 
 		t.Cleanup(func() {
-			if err := converter.RevertToRegistry(context.Background(), allFilesToRestore); err != nil {
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := converter.RevertToRegistry(cleanupCtx, allFilesToRestore); err != nil {
 				t.Logf("Warning: Failed to revert files to registry source: %v", err)
 			}
 		})
@@ -326,24 +327,33 @@ func extractModuleInfoFromRepo() ModuleInfo {
 	}
 
 	if repoName := getRepoNameFromGit(wd); repoName != "" {
-		re := regexp.MustCompile(`^terraform-([^-]+)-(.+)$`)
-		if matches := re.FindStringSubmatch(repoName); len(matches) > 2 {
-			return ModuleInfo{
-				Name:     matches[2],
-				Provider: matches[1],
-			}
+		if info, ok := parseModuleName(repoName); ok {
+			return info
 		}
 	}
 
 	repoName := filepath.Base(wd)
-	re := regexp.MustCompile(`^terraform-([^-]+)-(.+)$`)
-	if matches := re.FindStringSubmatch(repoName); len(matches) > 2 {
-		return ModuleInfo{
-			Name:     matches[2],
-			Provider: matches[1],
-		}
+	if info, ok := parseModuleName(repoName); ok {
+		return info
 	}
 	return ModuleInfo{}
+}
+
+func parseModuleName(repoName string) (ModuleInfo, bool) {
+	const prefix = "terraform-"
+	if !strings.HasPrefix(repoName, prefix) {
+		return ModuleInfo{}, false
+	}
+
+	parts := strings.SplitN(repoName[len(prefix):], "-", 2)
+	if len(parts) != 2 {
+		return ModuleInfo{}, false
+	}
+
+	return ModuleInfo{
+		Provider: parts[0],
+		Name:     parts[1],
+	}, true
 }
 
 func getRepoNameFromGit(dir string) string {

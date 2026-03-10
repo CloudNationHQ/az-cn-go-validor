@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.17.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.17.0...v1.17.1) (2026-02-23)
+
+
+### Bug Fixes
+
+* preallocate slices in extractModuleNames and createModulesFromNames ([#111](https://github.com/CloudNationHQ/az-cn-go-validor/issues/111)) ([2d886a4](https://github.com/CloudNationHQ/az-cn-go-validor/commit/2d886a4bce41e560bc3add10605a5103bc054331)), closes [#89](https://github.com/CloudNationHQ/az-cn-go-validor/issues/89)
+* remove redundant zero value initialization (fixes [#91](https://github.com/CloudNationHQ/az-cn-go-validor/issues/91)) ([#112](https://github.com/CloudNationHQ/az-cn-go-validor/issues/112)) ([7c505ba](https://github.com/CloudNationHQ/az-cn-go-validor/commit/7c505badce023a42e15921f1a781419e0b5cc285))
+
+## [1.17.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.16.1...v1.17.0) (2026-02-21)
+
+
+### Features
+
+* small overall refactor ([#109](https://github.com/CloudNationHQ/az-cn-go-validor/issues/109)) ([6cdbec4](https://github.com/CloudNationHQ/az-cn-go-validor/commit/6cdbec4882fc330aa35771eba128b4811b5d1566))
+
+## [1.16.1](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.16.0...v1.16.1) (2026-02-21)
+
+
+### Bug Fixes
+
+* align moduleDiscoverer and TestRunner interfaces with implementation ([#99](https://github.com/CloudNationHQ/az-cn-go-validor/issues/99)) ([d3cd9cb](https://github.com/CloudNationHQ/az-cn-go-validor/commit/d3cd9cb59900cd7a442ebf5dec739e9518718289))
+* make global config initialization thread-safe with sync.Once ([#97](https://github.com/CloudNationHQ/az-cn-go-validor/issues/97)) ([fce6c0e](https://github.com/CloudNationHQ/az-cn-go-validor/commit/fce6c0ee4b8028b239e929b23f69ca4287ce036b))
+* remove unreachable return statement after t.Fatal() ([#100](https://github.com/CloudNationHQ/az-cn-go-validor/issues/100)) ([908d54b](https://github.com/CloudNationHQ/az-cn-go-validor/commit/908d54b4843e1adf5068c2ced598b68c1fa1a2ab))
+* remove unused ModuleProcessor interface ([#101](https://github.com/CloudNationHQ/az-cn-go-validor/issues/101)) ([d19f1e1](https://github.com/CloudNationHQ/az-cn-go-validor/commit/d19f1e105ccebbb84c1e5183214f590bf67430a5))
+* replace clever bool-to-string map with BoolToStr helper ([#102](https://github.com/CloudNationHQ/az-cn-go-validor/issues/102)) ([7f8ee8c](https://github.com/CloudNationHQ/az-cn-go-validor/commit/7f8ee8cdc8adbc054642cc24f71d5cd41c9d3b44))
+* replace regex with idiomatic string operations ([#103](https://github.com/CloudNationHQ/az-cn-go-validor/issues/103)) ([f2ca5e6](https://github.com/CloudNationHQ/az-cn-go-validor/commit/f2ca5e6b8824d6c9a4dcc34825c9793ba5a31a9b))
+
 ## [1.16.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.15.0...v1.16.0) (2025-12-05)
 
 

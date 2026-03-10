@@ -2,6 +2,7 @@ package validor
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -32,7 +33,7 @@ func TestPrintModuleSummary_FailureCount(t *testing.T) {
 				{
 					Name:   "example2",
 					Path:   "/path/example2",
-					Errors: []string{"terraform apply failed"},
+					Errors: []error{fmt.Errorf("terraform apply failed")},
 				},
 				NewModule("example3", "/path/example3"),
 			},
@@ -46,13 +47,13 @@ func TestPrintModuleSummary_FailureCount(t *testing.T) {
 				{
 					Name:   "example1",
 					Path:   "/path/example1",
-					Errors: []string{"apply error"},
+					Errors: []error{fmt.Errorf("apply error")},
 				},
 				NewModule("example2", "/path/example2"),
 				{
 					Name:   "example3",
 					Path:   "/path/example3",
-					Errors: []string{"destroy error", "cleanup error"},
+					Errors: []error{fmt.Errorf("destroy error"), fmt.Errorf("cleanup error")},
 				},
 			},
 			expectedFailCount:  2,
@@ -65,12 +66,12 @@ func TestPrintModuleSummary_FailureCount(t *testing.T) {
 				{
 					Name:   "example1",
 					Path:   "/path/example1",
-					Errors: []string{"error 1"},
+					Errors: []error{fmt.Errorf("error 1")},
 				},
 				{
 					Name:   "example2",
 					Path:   "/path/example2",
-					Errors: []string{"error 2"},
+					Errors: []error{fmt.Errorf("error 2")},
 				},
 			},
 			expectedFailCount:  2,
@@ -85,7 +86,7 @@ func TestPrintModuleSummary_FailureCount(t *testing.T) {
 					Name:        "example2",
 					Path:        "/path/example2",
 					ApplyFailed: true,
-					Errors:      []string{"terraform apply failed"},
+					Errors:      []error{fmt.Errorf("terraform apply failed")},
 				},
 				NewModule("example3", "/path/example3"),
 			},
@@ -99,7 +100,7 @@ func TestPrintModuleSummary_FailureCount(t *testing.T) {
 				{
 					Name:   "example1",
 					Path:   "/path/example1",
-					Errors: []string{"error 1", "error 2", "error 3"},
+					Errors: []error{fmt.Errorf("error 1"), fmt.Errorf("error 2"), fmt.Errorf("error 3")},
 				},
 				NewModule("example2", "/path/example2"),
 			},
@@ -148,7 +149,7 @@ func TestModuleFailureTracking(t *testing.T) {
 	t.Run("module with apply error should be marked as failed", func(t *testing.T) {
 		module := NewModule("test", "/path")
 		module.ApplyFailed = true
-		module.Errors = append(module.Errors, "apply error")
+		module.Errors = append(module.Errors, fmt.Errorf("apply error"))
 
 		if !module.ApplyFailed {
 			t.Error("Module should be marked as ApplyFailed")
@@ -161,7 +162,7 @@ func TestModuleFailureTracking(t *testing.T) {
 	t.Run("module with destroy error but successful apply", func(t *testing.T) {
 		module := NewModule("test", "/path")
 		module.ApplyFailed = false
-		module.Errors = append(module.Errors, "destroy error")
+		module.Errors = append(module.Errors, fmt.Errorf("destroy error"))
 
 		if module.ApplyFailed {
 			t.Error("Module should not be marked as ApplyFailed")
@@ -174,7 +175,7 @@ func TestModuleFailureTracking(t *testing.T) {
 	t.Run("module with cleanup error but successful apply", func(t *testing.T) {
 		module := NewModule("test", "/path")
 		module.ApplyFailed = false
-		module.Errors = append(module.Errors, "cleanup error")
+		module.Errors = append(module.Errors, fmt.Errorf("cleanup error"))
 
 		if len(module.Errors) != 1 {
 			t.Errorf("Module should have 1 error, got %d", len(module.Errors))
@@ -194,11 +195,11 @@ func TestTestResults_FailureTracking(t *testing.T) {
 
 		// Add 2 failed modules
 		failed1 := NewModule("failed1", "/path4")
-		failed1.Errors = append(failed1.Errors, "error")
+		failed1.Errors = append(failed1.Errors, fmt.Errorf("error"))
 		results.AddModule(failed1)
 
 		failed2 := NewModule("failed2", "/path5")
-		failed2.Errors = append(failed2.Errors, "error")
+		failed2.Errors = append(failed2.Errors, fmt.Errorf("error"))
 		results.AddModule(failed2)
 
 		modules, failedModules := results.GetResults()

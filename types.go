@@ -1,17 +1,9 @@
 package validor
 
 import (
-	"context"
 	"fmt"
 	"sync"
-	"testing"
 )
-
-type ModuleProcessor interface {
-	Apply(ctx context.Context, t *testing.T) error
-	Destroy(ctx context.Context, t *testing.T) error
-	CleanupFiles(t *testing.T) error
-}
 
 type TestResults struct {
 	mu            sync.RWMutex
@@ -20,10 +12,7 @@ type TestResults struct {
 }
 
 func NewTestResults() *TestResults {
-	return &TestResults{
-		modules:       make([]*Module, 0),
-		failedModules: make([]*Module, 0),
-	}
+	return &TestResults{}
 }
 
 func (tr *TestResults) AddModule(module *Module) {
