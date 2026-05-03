@@ -3,96 +3,11 @@ package validor
 
 import (
 	"context"
-	"flag"
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
-	"time"
 )
-
-var flagConfig = &Config{
-	Namespace: "cloudnationhq",
-}
-
-func init() {
-	flag.BoolVar(&flagConfig.SkipDestroy, "skip-destroy", false, "Skip running terraform destroy after apply")
-	flag.StringVar(&flagConfig.Exception, "exception", "", "Comma-separated list of examples to exclude")
-	flag.StringVar(&flagConfig.Example, "example", "", "Specific example(s) to test (comma-separated)")
-	flag.BoolVar(&flagConfig.Local, "local", false, "Use local source for testing")
-	flag.StringVar(&flagConfig.Namespace, "namespace", flagConfig.Namespace, "Terraform registry namespace")
-	flag.StringVar(&flagConfig.ExamplesPath, "examples-path", "", "Path to examples directory (defaults to '../examples')")
-}
-
-type Config struct {
-	SkipDestroy   bool
-	Exception     string
-	Example       string
-	Local         bool
-	ExceptionList []string
-	Namespace     string
-	ExamplesPath  string
-}
-
-type Option func(*Config)
-
-func WithSkipDestroy(skip bool) Option {
-	return func(c *Config) { c.SkipDestroy = skip }
-}
-
-func WithException(exception string) Option {
-	return func(c *Config) {
-		c.Exception = exception
-		c.ParseExceptionList()
-	}
-}
-
-func WithExample(example string) Option {
-	return func(c *Config) { c.Example = example }
-}
-
-func WithLocal(local bool) Option {
-	return func(c *Config) { c.Local = local }
-}
-
-func WithExamplesPath(path string) Option {
-	return func(c *Config) { c.ExamplesPath = path }
-}
-
-func WithNamespace(namespace string) Option {
-	return func(c *Config) { c.Namespace = namespace }
-}
-
-func NewConfig(opts ...Option) *Config {
-	config := &Config{
-		Namespace: "cloudnationhq", // default
-	}
-	for _, opt := range opts {
-		opt(config)
-	}
-	return config
-}
-
-func NewConfigFromFlags() *Config {
-	if !flag.Parsed() {
-		flag.Parse()
-	}
-	flagConfig.ParseExceptionList()
-	return flagConfig
-}
-
-func (c *Config) ParseExceptionList() {
-	c.ExceptionList = []string{}
-	if c.Exception == "" {
-		return
-	}
-	for _, ex := range strings.FieldsFunc(c.Exception, func(r rune) bool { return r == ',' }) {
-		c.ExceptionList = append(c.ExceptionList, strings.TrimSpace(ex))
-	}
-}
 
 func TestApplyNoError(t *testing.T, opts ...Option) {
 	config := setupConfigWithOptions(opts...)
@@ -126,36 +41,8 @@ func TestApplyAllLocal(t *testing.T, opts ...Option) {
 	runModuleTests(t, modules, true, config, createLocalSetupFunc(config), "local")
 }
 
-type TestOption func(*TestConfig)
-
-type TestSetupFunc func(ctx context.Context, t *testing.T, modules []*Module) error
-
-type TestConfig struct {
-	Config       *Config
-	ModuleNames  []string
-	UseLocal     bool
-	Parallel     bool
-	ExamplesPath string
-}
-
-func WithConfig(config *Config) TestOption {
-	return func(tc *TestConfig) { tc.Config = config }
-}
-
-func WithModules(moduleNames []string) TestOption {
-	return func(tc *TestConfig) { tc.ModuleNames = moduleNames }
-}
-
-func WithLocalSource(useLocal bool) TestOption {
-	return func(tc *TestConfig) { tc.UseLocal = useLocal }
-}
-
-func WithParallel(parallel bool) TestOption {
-	return func(tc *TestConfig) { tc.Parallel = parallel }
-}
-
-func WithTestExamplesPath(path string) TestOption {
-	return func(tc *TestConfig) { tc.ExamplesPath = path }
+func RunTests(t *testing.T, modules []*Module, parallel bool, config *Config) {
+	runModuleTests(t, modules, parallel, config, nil, "registry")
 }
 
 func RunTestsWithOptions(t *testing.T, opts ...TestOption) {
@@ -227,20 +114,6 @@ func runModuleTests(t *testing.T, modules []*Module, parallel bool, config *Conf
 	})
 }
 
-func setupConfigWithOptions(opts ...Option) *Config {
-	if len(opts) == 0 {
-		return NewConfigFromFlags()
-	}
-	return NewConfig(opts...)
-}
-
-func getExamplesPath(config *Config) string {
-	if config.ExamplesPath != "" {
-		return config.ExamplesPath
-	}
-	return filepath.Join("..", "examples")
-}
-
 func discoverModules(t *testing.T, config *Config) []*Module {
 	examplesPath := getExamplesPath(config)
 	manager := NewModuleManager(examplesPath)
@@ -268,120 +141,6 @@ func createModulesFromNames(moduleNames []string, basePath string) []*Module {
 		modules = append(modules, NewModule(name, path))
 	}
 	return modules
-}
-
-func convertModulesToLocal(ctx context.Context, t *testing.T, converter SourceConverter, moduleNames []string, exceptionList []string, moduleInfo ModuleInfo, examplesPath string) []FileRestore {
-	var allFilesToRestore []FileRestore
-
-	for _, moduleName := range moduleNames {
-		if slices.Contains(exceptionList, moduleName) {
-			continue
-		}
-
-		modulePath := filepath.Join(examplesPath, moduleName)
-		filesToRestore, err := converter.ConvertToLocal(ctx, modulePath, moduleInfo)
-		if err != nil {
-			t.Logf("Warning: Failed to convert module %s to local source: %v", moduleName, err)
-			continue
-		}
-		allFilesToRestore = append(allFilesToRestore, filesToRestore...)
-	}
-
-	return allFilesToRestore
-}
-
-func createLocalSetupFunc(config *Config) TestSetupFunc {
-	return func(ctx context.Context, t *testing.T, modules []*Module) error {
-		moduleInfo := extractModuleInfoFromRepo()
-		if moduleInfo.Name == "" || moduleInfo.Provider == "" {
-			return fmt.Errorf("could not determine module name and provider from repository")
-		}
-		moduleInfo.Namespace = config.Namespace
-
-		converter := NewSourceConverter(NewRegistryClient())
-		moduleNames := extractModuleNames(modules)
-		allFilesToRestore := convertModulesToLocal(ctx, t, converter, moduleNames, config.ExceptionList, moduleInfo, getExamplesPath(config))
-
-		t.Cleanup(func() {
-			cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			if err := converter.RevertToRegistry(cleanupCtx, allFilesToRestore); err != nil {
-				t.Logf("Warning: Failed to revert files to registry source: %v", err)
-			}
-		})
-		return nil
-	}
-}
-
-func parseExampleList(example string) []string {
-	var examples []string
-	for ex := range strings.SplitSeq(example, ",") {
-		if trimmed := strings.TrimSpace(ex); trimmed != "" {
-			examples = append(examples, trimmed)
-		}
-	}
-	return examples
-}
-
-func extractModuleInfoFromRepo() ModuleInfo {
-	wd, err := os.Getwd()
-	if err != nil {
-		return ModuleInfo{}
-	}
-
-	if filepath.Base(wd) == "tests" {
-		wd = filepath.Dir(wd)
-	}
-
-	if repoName := getRepoNameFromGit(wd); repoName != "" {
-		if info, ok := parseModuleName(repoName); ok {
-			return info
-		}
-	}
-
-	repoName := filepath.Base(wd)
-	if info, ok := parseModuleName(repoName); ok {
-		return info
-	}
-	return ModuleInfo{}
-}
-
-func parseModuleName(repoName string) (ModuleInfo, bool) {
-	const prefix = "terraform-"
-	if !strings.HasPrefix(repoName, prefix) {
-		return ModuleInfo{}, false
-	}
-
-	parts := strings.SplitN(repoName[len(prefix):], "-", 2)
-	if len(parts) != 2 {
-		return ModuleInfo{}, false
-	}
-
-	return ModuleInfo{
-		Provider: parts[0],
-		Name:     parts[1],
-	}, true
-}
-
-func getRepoNameFromGit(dir string) string {
-	output, err := gitRemoteURL(dir)
-	if err != nil {
-		return ""
-	}
-
-	url := strings.TrimSpace(string(output))
-	parts := strings.Split(url, "/")
-	if len(parts) > 0 {
-		repoName := parts[len(parts)-1]
-		return strings.TrimSuffix(repoName, ".git")
-	}
-	return ""
-}
-
-var gitRemoteURL = func(dir string) ([]byte, error) {
-	cmd := exec.Command("git", "remote", "get-url", "origin")
-	cmd.Dir = dir
-	return cmd.Output()
 }
 
 var runModuleTestsFn = runModuleTests
