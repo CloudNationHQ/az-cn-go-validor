@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.19.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.18.0...v1.19.0) (2026-05-03)
+
+
+### Features
+
+* **deps:** bump github.com/fatih/color from 1.18.0 to 1.19.0 ([#117](https://github.com/CloudNationHQ/az-cn-go-validor/issues/117)) ([5509632](https://github.com/CloudNationHQ/az-cn-go-validor/commit/550963287fa7ad911c61853db42b7f712c319297))
+* **deps:** bump github.com/zclconf/go-cty from 1.18.0 to 1.18.1 ([#118](https://github.com/CloudNationHQ/az-cn-go-validor/issues/118)) ([c610d32](https://github.com/CloudNationHQ/az-cn-go-validor/commit/c610d32793735fb1b2e60b715a3b5d9cbc04b470))
+* refactor package structure and consolidate tests while preserving behaviour ([#119](https://github.com/CloudNationHQ/az-cn-go-validor/issues/119)) ([ad9c1ec](https://github.com/CloudNationHQ/az-cn-go-validor/commit/ad9c1ecd61aa5d2c1889973ba6caa51c0572c633))
+
 ## [1.18.0](https://github.com/CloudNationHQ/az-cn-go-validor/compare/v1.17.1...v1.18.0) (2026-03-10)
 
 
