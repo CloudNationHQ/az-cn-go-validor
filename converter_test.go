@@ -11,18 +11,6 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-type mockRegistryClient struct {
-	latestVersion string
-	err           error
-}
-
-func (m *mockRegistryClient) GetLatestVersion(ctx context.Context, namespace, name, provider string) (string, error) {
-	if m.err != nil {
-		return "", m.err
-	}
-	return m.latestVersion, nil
-}
-
 func TestNewSourceConverter(t *testing.T) {
 	client := NewRegistryClient()
 	converter := NewSourceConverter(client)
@@ -337,9 +325,4 @@ func TestAttributeStringValue(t *testing.T) {
 			}
 		})
 	}
-}
-
-func testContext(t *testing.T) context.Context {
-	t.Helper()
-	return context.Background()
 }
