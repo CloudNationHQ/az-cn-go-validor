@@ -6,7 +6,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/gruntwork-io/terratest v0.56.0
 	github.com/hashicorp/hcl/v2 v2.22.0
-	github.com/zclconf/go-cty v1.18.0
+	github.com/zclconf/go-cty v1.18.1
 )
 
 require (
