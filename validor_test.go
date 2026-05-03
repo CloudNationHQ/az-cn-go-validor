@@ -413,38 +413,6 @@ module "test" {
 	}
 }
 
-func setupMockExamplesDir(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	for _, example := range []string{"example1", "example2", "example3"} {
-		exampleDir := filepath.Join(tmpDir, example)
-		if err := os.MkdirAll(exampleDir, 0755); err != nil {
-			t.Fatalf("failed to create example dir: %v", err)
-		}
-		mainTf := filepath.Join(exampleDir, "main.tf")
-		if err := os.WriteFile(mainTf, []byte("# mock terraform file"), 0644); err != nil {
-			t.Fatalf("failed to create main.tf: %v", err)
-		}
-	}
-
-	return tmpDir
-}
-
-func createMockModules(names []string, basePath string) []*Module {
-	modules := make([]*Module, len(names))
-	for i, name := range names {
-		modules[i] = NewModule(name, filepath.Join(basePath, name))
-		modules[i].applyHook = func(ctx context.Context, tb *testing.T, m *Module) error {
-			return nil
-		}
-		modules[i].destroyHook = func(ctx context.Context, tb *testing.T, m *Module) error {
-			return nil
-		}
-	}
-	return modules
-}
-
 func TestRunTests(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -632,4 +600,3 @@ func TestPublicAPI_ConfigOptions(t *testing.T) {
 		)
 	})
 }
-

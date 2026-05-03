@@ -7,23 +7,6 @@ import (
 	"testing"
 )
 
-type mockTB struct {
-	logs  []string
-	fatal bool
-}
-
-func (m *mockTB) Helper() {}
-func (m *mockTB) Log(args ...any) {
-	m.logs = append(m.logs, strings.TrimSpace(fmt.Sprint(args...)))
-}
-func (m *mockTB) Logf(format string, args ...any) {
-	m.logs = append(m.logs, fmt.Sprintf(format, args...))
-}
-func (m *mockTB) Fatal(args ...any) {
-	m.fatal = true
-	m.logs = append(m.logs, strings.TrimSpace(fmt.Sprint(args...)))
-}
-
 func TestRunModuleTests_SkipDestroy(t *testing.T) {
 	module := NewModule("mod1", t.TempDir())
 	var destroyCalled bool

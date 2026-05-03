@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
@@ -253,6 +254,79 @@ func TestPrintModuleSummary(t *testing.T) {
 		// This test just ensures PrintModuleSummary doesn't panic with failed modules
 		PrintModuleSummary(t, modules)
 	})
+}
+
+func TestPrintModuleSummary_OutputCounts(t *testing.T) {
+	tests := []struct {
+		name         string
+		modules      []*Module
+		wantContains string
+	}{
+		{
+			name: "all successful modules",
+			modules: []*Module{
+				NewModule("example1", "/path/example1"),
+				NewModule("example2", "/path/example2"),
+				NewModule("example3", "/path/example3"),
+			},
+			wantContains: "SUCCESS: All 3 modules",
+		},
+		{
+			name: "one failed module",
+			modules: []*Module{
+				NewModule("example1", "/path/example1"),
+				{
+					Name:   "example2",
+					Path:   "/path/example2",
+					Errors: []error{fmt.Errorf("terraform apply failed")},
+				},
+				NewModule("example3", "/path/example3"),
+			},
+			wantContains: "TOTAL: 1 of 3 modules failed",
+		},
+		{
+			name: "multiple failed modules",
+			modules: []*Module{
+				{
+					Name:   "example1",
+					Path:   "/path/example1",
+					Errors: []error{fmt.Errorf("apply error")},
+				},
+				NewModule("example2", "/path/example2"),
+				{
+					Name:   "example3",
+					Path:   "/path/example3",
+					Errors: []error{fmt.Errorf("destroy error"), fmt.Errorf("cleanup error")},
+				},
+			},
+			wantContains: "TOTAL: 2 of 3 modules failed",
+		},
+		{
+			name: "multiple errors count as one failed module",
+			modules: []*Module{
+				{
+					Name:   "example1",
+					Path:   "/path/example1",
+					Errors: []error{fmt.Errorf("error 1"), fmt.Errorf("error 2"), fmt.Errorf("error 3")},
+				},
+				NewModule("example2", "/path/example2"),
+			},
+			wantContains: "TOTAL: 1 of 2 modules failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockTB{}
+
+			PrintModuleSummary(mock, tt.modules)
+
+			got := strings.Join(mock.logs, "\n")
+			if !strings.Contains(got, tt.wantContains) {
+				t.Fatalf("expected summary to contain %q, got %q", tt.wantContains, got)
+			}
+		})
+	}
 }
 
 func TestModule_Cleanup(t *testing.T) {

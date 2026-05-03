@@ -120,9 +120,3 @@ func TestDefaultSourceConverter_RevertToRegistry_Fallback(t *testing.T) {
 		t.Fatalf("expected file to be restored to original content, got: %s", string(content))
 	}
 }
-
-type roundTripperFunc func(req *http.Request) (*http.Response, error)
-
-func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
-}

@@ -11,6 +11,8 @@ import (
 	"github.com/gruntwork-io/terratest/modules/terraform"
 )
 
+var cleanupPatterns = []string{"*.terraform*", "*tfstate*", "*.lock.hcl"}
+
 type Module struct {
 	Name        string
 	Path        string
@@ -93,10 +95,7 @@ func (m *Module) Apply(ctx context.Context, t *testing.T) error {
 	_, err := terraform.InitAndApplyE(t, m.Options)
 	if err != nil {
 		m.ApplyFailed = true
-		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform apply", Err: err}
-		m.Errors = append(m.Errors, wrappedErr)
-		t.Log(redError(wrappedErr.Error()))
-		return wrappedErr
+		return m.recordError(t, "terraform apply", err)
 	}
 	return nil
 }
@@ -106,18 +105,10 @@ func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 
 	if m.destroyHook != nil {
 		destroyErr := m.destroyHook(ctx, t, m)
-		if destroyErr != nil && !m.ApplyFailed {
-			wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform destroy", Err: destroyErr}
-			m.Errors = append(m.Errors, wrappedErr)
-			t.Log(redError(wrappedErr.Error()))
-		}
+		m.recordErrorIfAllowed(t, "terraform destroy", destroyErr)
 
 		if m.cleanupHook != nil && !m.ApplyFailed {
-			if err := m.cleanupHook(ctx, t, m); err != nil {
-				wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "cleanup", Err: err}
-				m.Errors = append(m.Errors, wrappedErr)
-				t.Log(redError(wrappedErr.Error()))
-			}
+			m.recordErrorIfAllowed(t, "cleanup", m.cleanupHook(ctx, t, m))
 		}
 		return destroyErr
 	}
@@ -125,18 +116,8 @@ func (m *Module) Destroy(ctx context.Context, t *testing.T) error {
 	t.Logf("Destroying Terraform module: %s", m.Name)
 
 	_, destroyErr := terraform.DestroyE(t, m.Options)
-
-	if destroyErr != nil && !m.ApplyFailed {
-		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "terraform destroy", Err: destroyErr}
-		m.Errors = append(m.Errors, wrappedErr)
-		t.Log(redError(wrappedErr.Error()))
-	}
-
-	if err := m.Cleanup(ctx, t); err != nil && !m.ApplyFailed {
-		wrappedErr := &ModuleError{ModuleName: m.Name, Operation: "cleanup", Err: err}
-		m.Errors = append(m.Errors, wrappedErr)
-		t.Log(redError(wrappedErr.Error()))
-	}
+	m.recordErrorIfAllowed(t, "terraform destroy", destroyErr)
+	m.recordErrorIfAllowed(t, "cleanup", m.Cleanup(ctx, t))
 
 	return destroyErr
 }
@@ -149,9 +130,7 @@ func (m *Module) Cleanup(ctx context.Context, t *testing.T) error {
 	}
 
 	t.Logf("Cleaning up in: %s", m.Options.TerraformDir)
-	filesToCleanup := []string{"*.terraform*", "*tfstate*", "*.lock.hcl"}
-
-	for _, pattern := range filesToCleanup {
+	for _, pattern := range cleanupPatterns {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -169,6 +148,24 @@ func (m *Module) Cleanup(ctx context.Context, t *testing.T) error {
 		}
 	}
 	return nil
+}
+
+func (m *Module) recordErrorIfAllowed(t *testing.T, operation string, err error) error {
+	t.Helper()
+
+	if err == nil || m.ApplyFailed {
+		return err
+	}
+	return m.recordError(t, operation, err)
+}
+
+func (m *Module) recordError(t *testing.T, operation string, err error) error {
+	t.Helper()
+
+	wrappedErr := &ModuleError{ModuleName: m.Name, Operation: operation, Err: err}
+	m.Errors = append(m.Errors, wrappedErr)
+	t.Log(redError(wrappedErr.Error()))
+	return wrappedErr
 }
 
 func PrintModuleSummary(tb testLogger, modules []*Module) {
